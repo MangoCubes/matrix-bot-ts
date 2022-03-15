@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "better-sqlite3": "^7.5.0",
+    "matrix-bot-sdk": "0.6.0-beta.6",
+    "olm": "https://packages.matrix.org/npm/olm/olm-3.2.1.tgz"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node ./dist/index.js"
+  }
+}
