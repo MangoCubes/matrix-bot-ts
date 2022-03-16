@@ -12,6 +12,7 @@ export default class Client{
 	client: MatrixClient;
 	prefix: string;
 	userId: string | null;
+	deviceId: string | null;
 	constructor(configDir: string){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		this.client = new MatrixClient(
@@ -23,6 +24,7 @@ export default class Client{
 		this.prefix = config.prefix;
 		this.client.setJoinStrategy(new SimpleRetryJoinStrategy());
 		AutojoinRoomsMixin.setupOnClient(this.client);
+		this.deviceId = null;
 		this.userId = null;
 	}
 
@@ -30,10 +32,11 @@ export default class Client{
 		this.client.on('room.message', this.handleMessage.bind(this));
 		await this.client.start();
 		this.userId = await this.client.getUserId();
-		console.log('Client started.');
+		this.deviceId = this.client.crypto.clientDeviceId;
+		console.log('Client started as ' + this.userId + ' with device ID of ' + this.deviceId + '.');
 	}
 
-	async sendMessage(message: string, roomId: string){
+	async sendMessage(roomId: string, message: string){
 		await this.client.sendMessage(roomId, {
             body: message,
             msgtype: 'm.text',
