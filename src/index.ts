@@ -3,5 +3,10 @@ import * as olm from 'olm';
 
 global.Olm = olm;
 
-const client = new Client('./config/credentials.json');
-client.start();
+async function main(){
+	const client = new Client('./config/credentials.json');
+	await client.start();
+	client.sendMessage('msg', '!qhgXqbntifEwONeAdZ:matrix.skew.ch');
+}
+
+main();

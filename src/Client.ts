@@ -27,7 +27,10 @@ export default class Client{
 		console.log('Client started.');
 	}
 
-	async sendMessage(){
-
+	async sendMessage(message: string, roomId: string){
+		await this.client.sendMessage(roomId, {
+            body: message,
+            msgtype: 'm.text',
+        });
 	}
 }
