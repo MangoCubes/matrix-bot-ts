@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent } from 'matrix-js-sdk';
+import sdk, { ClientEvent, MatrixEvent, Room, RoomEvent } from 'matrix-js-sdk';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
 
@@ -34,6 +34,13 @@ export default class Client{
 			this.client.on(ClientEvent.Sync, (state) => {
 
 			});
+			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
+				if (e.event.type === 'm.room.encrypted') {
+					const event = await this.client.crypto.decryptEvent(e);
+					this.sendMessage('!bAcbCoXicoDBTeXRSc:matrix.skew.ch', '12341234')
+				}
+			});
+
 			this.userId = this.client.getUserId();
 			console.log('Client started as ' + this.userId + '.');
 		} catch(e){
