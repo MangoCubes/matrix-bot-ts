@@ -1,39 +1,44 @@
-import {
-	AutojoinRoomsMixin,
-    MatrixClient,
-	RustSdkCryptoStorageProvider,
-    SimpleFsStorageProvider,
-	SimpleRetryJoinStrategy,
-} from "matrix-bot-sdk";
 import { readFileSync } from 'fs';
-import path from "path";
+import sdk, { ClientEvent } from 'matrix-js-sdk';
+import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
+import { LocalStorage } from 'node-localstorage';
 
 export default class Client{
-	client: MatrixClient;
+	client: sdk.MatrixClient;
 	prefix: string;
 	userId: string | null;
 	deviceId: string | null;
 	constructor(configDir: string){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
-		this.client = new MatrixClient(
-			config.serverUrl,
-			config.accessToken,
-			new SimpleFsStorageProvider(path.join(config.storage, 'bot.json')),
-			new RustSdkCryptoStorageProvider(path.join(config.storage, 'crypto'))
-		);
+		const localStorage = new LocalStorage(config.storage);
+		this.client = sdk.createClient({
+			baseUrl: config.serverUrl,
+			accessToken: config.accessToken,
+			cryptoStore: new LocalStorageCryptoStore(localStorage),
+			sessionStore: {
+				getLocalTrustedBackupPubKey: () => null,
+			},
+			userId: config.userId,
+		    deviceId: config.deviceId,
+		});
 		this.prefix = config.prefix;
-		this.client.setJoinStrategy(new SimpleRetryJoinStrategy());
-		AutojoinRoomsMixin.setupOnClient(this.client);
 		this.deviceId = null;
 		this.userId = null;
 	}
 
 	async init(){
-		this.client.on('room.message', this.handleMessage.bind(this));
-		await this.client.start();
-		this.userId = await this.client.getUserId();
-		this.deviceId = this.client.crypto.clientDeviceId;
-		console.log('Client started as ' + this.userId + ' with device ID of ' + this.deviceId + '.');
+		try{
+			await this.client.initCrypto();
+			await this.client.startClient({ initialSyncLimit: 0 });
+        	this.client.uploadKeys();
+			this.client.on(ClientEvent.Sync, (state) => {
+
+			});
+			this.userId = this.client.getUserId();
+			console.log('Client started as ' + this.userId + '.');
+		} catch(e){
+			console.log('Unable to start client: ' + e);
+		}
 	}
 
 	async sendMessage(roomId: string, message: string){
@@ -46,7 +51,7 @@ export default class Client{
 	async handleMessage(roomId: string, data: any){
 		if (data.isRedacted) return;
         if (data.sender === this.userId) return;
-        if (data.content.msgtype !== "m.text") return;
+        if (data.content.msgtype !== 'm.text') return;
 		if ((data.content.body as string).startsWith(this.prefix)) {
 			this.sendMessage(data.content.body, roomId);
 		}

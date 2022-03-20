@@ -1,9 +1,8 @@
-import * as olm from 'olm';
 import Client from './Client';
-
-global.Olm = olm;
+import Olm from 'olm';
 
 async function main(){
+	global.Olm = Olm;
 	const client = new Client('./config/credentials.json');
 	await client.init();
 }
