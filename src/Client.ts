@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, MatrixEvent, Room, RoomEvent } from 'matrix-js-sdk';
+import sdk, { ClientEvent, MatrixEvent, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
 
@@ -34,10 +34,19 @@ export default class Client{
 			this.client.on(ClientEvent.Sync, (state) => {
 
 			});
+
+			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
+
+			this.client.on(ClientEvent.ToDeviceEvent, e => {
+				console.log(e);
+			});
+
 			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
+				console.log(e);
 				if (e.event.type === 'm.room.encrypted') {
 					const event = await this.client.crypto.decryptEvent(e);
-					this.sendMessage('!bAcbCoXicoDBTeXRSc:matrix.skew.ch', '12341234')
+					//console.log(event)
+					//this.sendMessage('!bAcbCoXicoDBTeXRSc:matrix.skew.ch', '12341234')
 				}
 			});
 
@@ -53,6 +62,13 @@ export default class Client{
             body: message,
             msgtype: 'm.text',
         });
+	}
+
+	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
+		if (m.membership === 'invite' && m.userId === this.userId) {
+			await this.client.joinRoom(m.roomId);
+			console.log(`Successfully joined ${m.roomId}.`);
+		}
 	}
 
 	async handleMessage(roomId: string, data: any){
