@@ -5,6 +5,7 @@ import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localSto
 import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
 import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
+import * as readline from 'readline';
 import { inspect } from 'util';
 
 export default class Client{
@@ -62,11 +63,47 @@ export default class Client{
 
 	async verificationHandler(req: VerificationRequest){
 		const verifier = req.beginKeyVerification(verificationMethods.SAS);
-		verifier.verify();
-		req.verifier.once(SasEvent.ShowSas, (e: ISasEvent) => {
-			console.log(`Decimal: ${e.sas.decimal}`);
-			console.log(`Emojis: ${e.sas.emoji}`);
+		req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
+			if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
+			if (e.sas.emoji){
+				let emojis = [];
+				for(const emoji of e.sas.emoji) emojis.push(`${emoji[0]} (${emoji[1]})`);
+				console.log(`Emojis: ${emojis.join(', ')}`);
+			}
+			const rl = readline.createInterface({
+				input: process.stdin,
+				output: process.stdout
+			});
+			rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
+			rl.prompt();
+			rl.on('line', (line) => {
+				switch(line.trim().toLowerCase()) {
+					case 'y':
+						e.confirm();
+						rl.write('Verified. Please wait until the peer verifies their emoji.');
+						rl.close();
+						return;
+					case 'n':
+						e.mismatch();
+						rl.write('Emojis do not match; Communication may be compromised.');
+						rl.close();
+						return;
+					case 'c':
+						e.cancel();
+						rl.write('Verification cancelled.');
+						rl.close();
+						return;
+				}
+				rl.prompt();
+			});
 		});
+		try{
+			await verifier.verify();
+			console.log('Verification successful.');
+		} catch(e){
+			console.log('Verification cancelled.');
+			return;
+		}
 	}
 
 	async sendMessage(roomId: string, message: string){
