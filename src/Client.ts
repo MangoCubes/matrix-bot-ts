@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import sdk, { ClientEvent, MatrixEvent, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
+import { UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
 import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
@@ -45,13 +46,10 @@ export default class Client{
 			this.client.on(ClientEvent.ToDeviceEvent, e => {
 				//console.log(e);
 			});
-
+*/
 			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
-				if (e.event.type === 'm.room.encrypted') {
-					await this.messageHandler(room.roomId, e);
-					//if(event.clearEvent.content.msgtype === 'm.key.verification.request') ;
-				}
-			});*/
+				if (e.event.type === 'm.room.encrypted') await this.messageHandler(room.roomId, e);
+			});
 
 
 			this.userId = this.client.getUserId();
@@ -59,6 +57,13 @@ export default class Client{
 		} catch(e){
 			console.log('Unable to start client: ' + e);
 		}
+	}
+
+	async sendVerification(userId: string){
+		const req = await this.client.requestVerification(userId);
+		await req.waitFor(() => req.started || req.cancelled);
+		if (req.cancelled) console.log('Verification cancelled by user.');
+		else await this.verificationHandler(req);
 	}
 
 	async verificationHandler(req: VerificationRequest){
@@ -107,10 +112,19 @@ export default class Client{
 	}
 
 	async sendMessage(roomId: string, message: string){
-		await this.client.sendMessage(roomId, {
-            body: message,
-            msgtype: 'm.text',
-        });
+		try{
+			await this.client.sendMessage(roomId, {
+        	    body: message,
+        	    msgtype: 'm.text',
+        	});
+		} catch(e){
+			if(e instanceof UnknownDeviceError){
+				for(const d in e.devices){
+					this.sendVerification(d);
+				}
+				//console.log(e.devices);
+			}
+		}
 	}
 
 	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
@@ -125,5 +139,6 @@ export default class Client{
         if (data.sender.userId === this.userId) return;
 		const e = await this.client.crypto.decryptEvent(data);
 		const cmd = (e.clearEvent.content.body as string).split(' ');
+		if(cmd[0] === 'echo') this.sendMessage('!ExoqYyhyXTSFFbYxvh:matrix.skew.ch', cmd[1]);
 	}
 }
