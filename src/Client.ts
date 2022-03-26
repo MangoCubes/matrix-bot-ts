@@ -48,7 +48,7 @@ export default class Client{
 			});
 */
 			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
-				if (e.event.type === 'm.room.encrypted') await this.messageHandler(room.roomId, e);
+				if (e.isEncrypted()) await this.messageHandler(room.roomId, e);
 			});
 
 
@@ -66,8 +66,13 @@ export default class Client{
 		else await this.verificationHandler(req);
 	}
 
+	async signOutOtherSessions(){
+		const dev = await this.client.getDevices();
+		for(const d of dev.devices){
+		}
+	}
+
 	async verificationHandler(req: VerificationRequest){
-		const verifier = req.beginKeyVerification(verificationMethods.SAS);
 		req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
 			if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
 			if (e.sas.emoji){
@@ -81,10 +86,10 @@ export default class Client{
 			});
 			rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
 			rl.prompt();
-			rl.on('line', (line) => {
+			rl.on('line', async (line) => {
 				switch(line.trim().toLowerCase()) {
 					case 'y':
-						e.confirm();
+						await e.confirm();
 						rl.write('Verified. Please wait until the peer verifies their emoji.');
 						rl.close();
 						return;
@@ -103,9 +108,10 @@ export default class Client{
 			});
 		});
 		try{
-			await verifier.verify();
+			await req.verifier.verify();
 			console.log('Verification successful.');
 		} catch(e){
+			console.log(e)
 			console.log('Verification cancelled.');
 			return;
 		}
@@ -122,7 +128,7 @@ export default class Client{
 				for(const d in e.devices){
 					this.sendVerification(d);
 				}
-				//console.log(e.devices);
+				console.log(e.devices);
 			}
 		}
 	}
@@ -137,8 +143,13 @@ export default class Client{
 	async messageHandler(roomId: string, data: MatrixEvent){
 		if (data.isRedacted()) return;
         if (data.sender.userId === this.userId) return;
-		const e = await this.client.crypto.decryptEvent(data);
-		const cmd = (e.clearEvent.content.body as string).split(' ');
-		if(cmd[0] === 'echo') this.sendMessage('!ExoqYyhyXTSFFbYxvh:matrix.skew.ch', cmd[1]);
+		try{
+			const e = await this.client.crypto.decryptEvent(data);
+			const cmd = (e.clearEvent.content.body as string).split(' ');
+			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
+		} catch(err){
+			console.log('Error handling message: ');
+			console.log(err)
+		}
 	}
 }
