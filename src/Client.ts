@@ -73,6 +73,13 @@ export default class Client{
 	}
 
 	async verificationHandler(req: VerificationRequest){
+		if (!req.verifier) {
+			await req.accept();
+			if (req.cancelled) {
+				console.log('Request cancelled.');
+				return;
+			}
+		}
 		req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
 			if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
 			if (e.sas.emoji){
