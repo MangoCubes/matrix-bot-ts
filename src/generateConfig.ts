@@ -10,7 +10,7 @@ interface ConfigFile{
 	deviceId: string
 }
 
-export default async function generateConfig(){
+export default function generateConfig(){
 	const rl = readline.createInterface({
 		input: process.stdin,
 		output: process.stdout,
@@ -68,14 +68,13 @@ export default async function generateConfig(){
 					config.deviceId = res.device_id;
 					await fs.writeFile('./config/credentials.json', JSON.stringify(config));
 					await fs.mkdir(config.storage, {recursive: true});
-					console.log('File successfully created. Starting client...');
+					console.log('File successfully created. Please restart.');
 					return;
 				} catch(e){
 					console.log('Cannot login.');
 					console.log(e);
 					process.exit(1);
 				}
-				break;
 		}
 		rl.prompt();
 	});

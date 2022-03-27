@@ -2,12 +2,12 @@ import { readFileSync } from 'fs';
 import sdk, { ClientEvent, MatrixEvent, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
+import { DeviceList } from 'matrix-js-sdk/lib/crypto/DeviceList';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
 import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
 import * as readline from 'readline';
-import { inspect } from 'util';
 
 export default class Client{
 	client: sdk.MatrixClient;
@@ -15,6 +15,7 @@ export default class Client{
 	userId: string | null;
 	deviceId: string | null;
 	debugMode: boolean;
+	token: string;
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const localStorage = new LocalStorage(config.storage);
@@ -30,8 +31,9 @@ export default class Client{
 		    deviceId: config.deviceId,
 		});
 		this.prefix = config.prefix;
-		this.deviceId = null;
-		this.userId = null;
+		this.deviceId = config.deviceId;
+		this.userId = config.userId;
+		this.token = config.accessToken;
 	}
 
 	async init(){
@@ -50,9 +52,6 @@ export default class Client{
 			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
 				if (e.isEncrypted()) await this.messageHandler(room.roomId, e);
 			});
-
-
-			this.userId = this.client.getUserId();
 			if (this.debugMode) console.log('Client started as ' + this.userId + '.');
 		} catch(e){
 			console.log('Unable to start client: ' + e);
@@ -64,12 +63,6 @@ export default class Client{
 		await req.waitFor(() => req.started || req.cancelled);
 		if (req.cancelled) console.log('Verification cancelled by user.');
 		else await this.verificationHandler(req);
-	}
-
-	async signOutOtherSessions(){
-		const dev = await this.client.getDevices();
-		for(const d of dev.devices){
-		}
 	}
 
 	async verificationHandler(req: VerificationRequest){
@@ -97,17 +90,17 @@ export default class Client{
 				switch(line.trim().toLowerCase()) {
 					case 'y':
 						await e.confirm();
-						rl.write('Verified. Please wait until the peer verifies their emoji.');
+						console.log('Verified. Please wait until the peer verifies their emoji.');
 						rl.close();
 						return;
 					case 'n':
 						e.mismatch();
-						rl.write('Emojis do not match; Communication may be compromised.');
+						console.log('Emojis do not match; Communication may be compromised.');
 						rl.close();
 						return;
 					case 'c':
 						e.cancel();
-						rl.write('Verification cancelled.');
+						console.log('Verification cancelled.');
 						rl.close();
 						return;
 				}

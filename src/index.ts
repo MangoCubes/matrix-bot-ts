@@ -7,9 +7,11 @@ import generateConfig from './generateConfig';
 async function main(){
 	logger.disableAll();
 	global.Olm = Olm;
-	if(!fs.existsSync('./config/credentials.json')) await generateConfig();
-	const client = new Client('./config/credentials.json', true);
-	await client.init();
+	if(!fs.existsSync('./config/credentials.json')) generateConfig();
+	else {
+		const client = new Client('./config/credentials.json', true);
+		await client.init();
+	}
 }
 
 main();
