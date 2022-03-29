@@ -155,8 +155,12 @@ export default class Client{
 				}
 				if(verified) verifiedMembers.push(m.userId);
 			}
-			if(unverifiedMembers.length) for(const m of verifiedMembers) await this.sendDM(m, `Following members are not verified: ${unverifiedMembers.join(', ')}`);
-			else await this.client.sendMessage(roomId, {
+			if(unverifiedMembers.length) {
+				for(const m of verifiedMembers) {
+					if(m !== this.userId) await this.sendDM(m, 
+					`Room ${room.roomId} has unverified members:\n${unverifiedMembers.join('\n')}\nOriginal message:\n${message}`);
+				}
+			} else await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
 			});
@@ -185,12 +189,22 @@ export default class Client{
 	}
 
 	async sendDM(userId: string, message: string){
-		const room = this.dmRooms[userId];
-		if(room) await this.sendMessage(room, message);
-		else{
-			const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
-			this.dmRooms[userId] = roomId.room_id;
-			await this.sendMessage(roomId.room_id, message);
+		let room = this.dmRooms[userId];
+		try{
+			if(!room){
+				const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
+				this.dmRooms[userId] = roomId.room_id;
+				room = roomId.room_id;
+			}
+			await this.client.sendMessage(room, {
+				body: message,
+				msgtype: 'm.text',
+			});
+		}catch(e){
+			if(e instanceof UnknownDeviceError){
+				for(const d in e.devices) this.sendVerification(d);
+			}
+			console.log('1234'+e);
 		}
 	}
 
