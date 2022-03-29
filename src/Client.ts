@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, MatrixEvent, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
+import sdk, { ClientEvent, MatrixEvent, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { DeviceList } from 'matrix-js-sdk/lib/crypto/DeviceList';
@@ -17,6 +17,7 @@ export default class Client{
 	debugMode: boolean;
 	token: string;
 	logRoom: string;
+	dmRooms: {[rid: string]: string};
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const localStorage = new LocalStorage(config.storage);
@@ -36,6 +37,7 @@ export default class Client{
 		this.userId = config.userId;
 		this.token = config.accessToken;
 		this.logRoom = config.logRoom;
+		this.dmRooms = {};
 	}
 
 	async init(){
@@ -44,9 +46,9 @@ export default class Client{
 			await this.client.startClient({ initialSyncLimit: 0 });
 			
 			this.client.on(CryptoEvent.VerificationRequest, this.verificationHandler.bind(this));
-/*
-			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
 
+			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
+/*
 			this.client.on(ClientEvent.ToDeviceEvent, e => {
 				//console.log(e);
 			});
@@ -60,6 +62,7 @@ export default class Client{
 					this.client.uploadKeys();
 					console.log('Client started as ' + this.userId + '.');
 					this.sendMessage(this.logRoom, 'Client started!');
+					this.sendDM('!wjoyaqYopMNaOBzceo:matrix.skew.ch', 'a')
 				}
 			});
 		} catch(e){
@@ -132,7 +135,31 @@ export default class Client{
 
 	async sendMessage(roomId: string, message: string){
 		try{
-			await this.client.sendMessage(roomId, {
+			const room = this.client.getRoom(roomId);
+			if(room === null) {
+				console.log(`Invalid room: ${roomId}`);
+				return;
+			}
+			let verifiedMembers = [];
+			let unverifiedFound = false;
+			const members = await room.getEncryptionTargetMembers();
+			for (const m of members) {
+				const devices = this.client.getStoredDevicesForUser(m.userId);
+				let verified = true;
+				for(const d of devices) {
+					if(d.isUnverified()) {
+						verified = false;
+						unverifiedFound = true;
+						break;
+					}
+				}
+				if(verified) verifiedMembers.push(m);
+			}
+			if(unverifiedFound){
+				for(const m of verifiedMembers){
+					this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [m.userId], is_direct: true});
+				}
+			} else await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
 			});
@@ -142,8 +169,26 @@ export default class Client{
 					this.sendVerification(d);
 				}
 				console.log(e.devices);
+				const room = this.client.getRoom(roomId);
 			}
 		}
+	}
+
+	async refreshDMRooms(){
+		const rooms = this.client.getRooms();
+		for(const r of rooms){
+			const members = r.getMembers();
+			if(members.length === 2){
+				if(members[0].userId === this.userId) this.dmRooms[members[1].userId] = r.roomId;
+				else this.dmRooms[members[0].userId] = r.roomId;
+			}
+		}
+	}
+
+	async sendDM(userId: string, message: string){
+		const dmEvent = this.client.getAccountData('m.direct');
+		console.log(dmEvent.event)
+		//this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
 	}
 
 	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
