@@ -59,10 +59,11 @@ export default class Client{
 			this.client.on(ClientEvent.Sync, async (state, lastState, data) => {
 				if(state === 'PREPARED'){
 					console.log(state)
-					this.client.uploadKeys();
+					await this.client.uploadKeys();
 					console.log('Client started as ' + this.userId + '.');
-					this.sendMessage(this.logRoom, 'Client started!');
-					this.sendDM('!wjoyaqYopMNaOBzceo:matrix.skew.ch', 'a')
+					await this.sendMessage(this.logRoom, 'Client started!');
+					await this.refreshDMRooms();
+					console.log(this.dmRooms)
 				}
 			});
 		} catch(e){
@@ -186,14 +187,19 @@ export default class Client{
 	}
 
 	async sendDM(userId: string, message: string){
-		const dmEvent = this.client.getAccountData('m.direct');
-		console.log(dmEvent.event)
-		//this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
+		const room = this.dmRooms[userId];
+		if(room) await this.sendMessage(room, message);
+		else{
+			const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
+			this.dmRooms[userId] = roomId.room_id;
+			await this.sendMessage(roomId.room_id, message);
+		}
 	}
 
 	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
 		if (m.membership === 'invite' && m.userId === this.userId) {
 			await this.client.joinRoom(m.roomId);
+			await this.refreshDMRooms();
 			console.log(`Successfully joined ${m.roomId}.`);
 		}
 	}
