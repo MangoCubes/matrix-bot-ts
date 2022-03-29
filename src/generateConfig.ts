@@ -7,7 +7,8 @@ interface ConfigFile{
 	accessToken: string,
 	storage: string,
 	userId: string,
-	deviceId: string
+	deviceId: string,
+	logRoom: string
 }
 
 export default function generateConfig(){
@@ -21,7 +22,8 @@ export default function generateConfig(){
 		accessToken: '',
 		storage: '',
 		userId: '',
-		deviceId: ''
+		deviceId: '',
+		logRoom: ''
 	}
 	console.log('No config file found. Creating new one.');
 	let step = 0;
@@ -38,7 +40,7 @@ export default function generateConfig(){
 					url = 'https://' + url;
 				} else hsUrl = url.split('//')[1];
 				config.serverUrl = url;
-				console.log(url)
+				console.log(url);
 				step = 1;
 				rl.setPrompt('Please enter your username: ');
 				break;
@@ -47,19 +49,27 @@ export default function generateConfig(){
 				if(!username.length) break;
 				if(!username.startsWith('@')) username = `@${username}:${hsUrl}`;
 				config.userId = username;
-				console.log(username)
+				console.log(username);
 				step = 2;
-				rl.setPrompt('Please enter path to store cryptographic files: ');
+				rl.setPrompt('Please enter the ID of the room this bot should log into: ');
 				break;
 			case 2:
+				let roomId = line.trim();
+				if(!roomId.length || !roomId.startsWith('!')) break;
+				config.logRoom = roomId;
+				console.log(roomId);
+				step = 3;
+				rl.setPrompt('Please enter path to store cryptographic files: ');
+				break;
+			case 3:
 				let directory = line.trim();
 				if(!directory.length) break;
 				config.storage = directory;
-				console.log(directory)
-				step = 3;
+				console.log(directory);
+				step = 4;
 				rl.setPrompt('Please enter your password: ');
 				break;
-			case 3:
+			case 4:
 				let password = line;
 				const client = sdk.createClient(config.serverUrl);
 				try{

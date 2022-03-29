@@ -16,6 +16,7 @@ export default class Client{
 	deviceId: string | null;
 	debugMode: boolean;
 	token: string;
+	logRoom: string;
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const localStorage = new LocalStorage(config.storage);
@@ -28,19 +29,20 @@ export default class Client{
 				getLocalTrustedBackupPubKey: () => null,
 			},
 			userId: config.userId,
-		    deviceId: config.deviceId,
+			deviceId: config.deviceId,
 		});
 		this.prefix = config.prefix;
 		this.deviceId = config.deviceId;
 		this.userId = config.userId;
 		this.token = config.accessToken;
+		this.logRoom = config.logRoom;
 	}
 
 	async init(){
 		try{
 			await this.client.initCrypto();
 			await this.client.startClient({ initialSyncLimit: 0 });
-        	this.client.uploadKeys();
+			
 			this.client.on(CryptoEvent.VerificationRequest, this.verificationHandler.bind(this));
 /*
 			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
@@ -52,7 +54,14 @@ export default class Client{
 			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
 				if (e.isEncrypted()) await this.messageHandler(room.roomId, e);
 			});
-			if (this.debugMode) console.log('Client started as ' + this.userId + '.');
+			this.client.on(ClientEvent.Sync, async (state, lastState, data) => {
+				if(state === 'PREPARED'){
+					console.log(state)
+					this.client.uploadKeys();
+					console.log('Client started as ' + this.userId + '.');
+					this.sendMessage(this.logRoom, 'Client started!');
+				}
+			});
 		} catch(e){
 			console.log('Unable to start client: ' + e);
 		}
@@ -66,10 +75,14 @@ export default class Client{
 	}
 
 	async verificationHandler(req: VerificationRequest){
+		console.log(req)
 		if (!req.verifier) {
-			await req.accept();
+			if (!req.initiatedByMe) {
+			  	await req.accept();
+				req.beginKeyVerification(verificationMethods.SAS);
+			} else await req.waitFor(() => req.started || req.cancelled);
 			if (req.cancelled) {
-				console.log('Request cancelled.');
+				console.log('Verification cancelled.')
 				return;
 			}
 		}
@@ -120,9 +133,9 @@ export default class Client{
 	async sendMessage(roomId: string, message: string){
 		try{
 			await this.client.sendMessage(roomId, {
-        	    body: message,
-        	    msgtype: 'm.text',
-        	});
+				body: message,
+				msgtype: 'm.text',
+			});
 		} catch(e){
 			if(e instanceof UnknownDeviceError){
 				for(const d in e.devices){
@@ -142,7 +155,7 @@ export default class Client{
 
 	async messageHandler(roomId: string, data: MatrixEvent){
 		if (data.isRedacted()) return;
-        if (data.sender.userId === this.userId) return;
+		if (data.sender.userId === this.userId) return;
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
 			const cmd = (e.clearEvent.content.body as string).split(' ');
