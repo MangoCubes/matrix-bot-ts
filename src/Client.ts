@@ -60,9 +60,8 @@ export default class Client{
 				if(state === 'PREPARED'){
 					console.log(state)
 					await this.client.uploadKeys();
-					console.log('Client started as ' + this.userId + '.');
-					await this.sendMessage(this.logRoom, 'Client started!');
 					await this.refreshDMRooms();
+					await this.sendMessage(this.logRoom, 'Client started!');
 					console.log(this.dmRooms)
 				}
 			});
@@ -142,7 +141,7 @@ export default class Client{
 				return;
 			}
 			let verifiedMembers = [];
-			let unverifiedFound = false;
+			let unverifiedMembers = [];
 			const members = await room.getEncryptionTargetMembers();
 			for (const m of members) {
 				const devices = this.client.getStoredDevicesForUser(m.userId);
@@ -150,17 +149,14 @@ export default class Client{
 				for(const d of devices) {
 					if(d.isUnverified()) {
 						verified = false;
-						unverifiedFound = true;
+						unverifiedMembers.push(m.userId);
 						break;
 					}
 				}
-				if(verified) verifiedMembers.push(m);
+				if(verified) verifiedMembers.push(m.userId);
 			}
-			if(unverifiedFound){
-				for(const m of verifiedMembers){
-					this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [m.userId], is_direct: true});
-				}
-			} else await this.client.sendMessage(roomId, {
+			if(unverifiedMembers.length) for(const m of verifiedMembers) await this.sendDM(m, `Following members are not verified: ${unverifiedMembers.join(', ')}`);
+			else await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
 			});
@@ -180,6 +176,8 @@ export default class Client{
 		for(const r of rooms){
 			const members = r.getMembers();
 			if(members.length === 2){
+				if(members[0].membership === 'leave' || members[1].membership === 'leave') continue;
+				if(!members[0].getDMInviter() && !members[1].getDMInviter()) continue;
 				if(members[0].userId === this.userId) this.dmRooms[members[1].userId] = r.roomId;
 				else this.dmRooms[members[0].userId] = r.roomId;
 			}
@@ -202,6 +200,7 @@ export default class Client{
 			await this.refreshDMRooms();
 			console.log(`Successfully joined ${m.roomId}.`);
 		}
+		console.log('12341234')
 	}
 
 	async messageHandler(roomId: string, data: MatrixEvent){
