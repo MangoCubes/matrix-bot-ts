@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import sdk, { ClientEvent, MatrixEvent, MsgType, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
-import { UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
+import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { DeviceList } from 'matrix-js-sdk/lib/crypto/DeviceList';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
@@ -81,7 +81,6 @@ export default class Client{
 		//console.log(req)
 		if (!req.verifier) {
 			if (!req.initiatedByMe) {
-			  	
 				req.beginKeyVerification(verificationMethods.SAS);
 				await req.accept();
 			} else await req.waitFor(() => req.started || req.cancelled);
@@ -206,7 +205,6 @@ export default class Client{
 			if(e instanceof UnknownDeviceError){
 				for(const d in e.devices) this.sendVerification(d);
 			}
-			console.log('1234'+e);
 		}
 	}
 
@@ -216,7 +214,6 @@ export default class Client{
 			await this.refreshDMRooms();
 			console.log(`Successfully joined ${m.roomId}.`);
 		}
-		console.log('12341234')
 	}
 
 	async messageHandler(roomId: string, data: MatrixEvent){
@@ -224,15 +221,18 @@ export default class Client{
 		if (data.sender.userId === this.userId) return;
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
-			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest){
-				this.sendVerification(data.sender.userId);
-				return;
-			}
+			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const cmd = (e.clearEvent.content.body as string).split(' ');
 			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
+			if(cmd[0] === 'invalidate') {
+				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
+			}
 		} catch(err){
-			console.log('Error handling message: ');
-			console.log(err)
+			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
+			else {
+				console.log('Error handling message: ');
+				console.log(err)
+			}
 		}
 	}
 }
