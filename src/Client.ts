@@ -58,11 +58,9 @@ export default class Client{
 			});
 			this.client.on(ClientEvent.Sync, async (state, lastState, data) => {
 				if(state === 'PREPARED'){
-					console.log(state)
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
 					await this.sendMessage(this.logRoom, 'Client started!');
-					console.log(this.dmRooms)
 				}
 			});
 		} catch(e){
@@ -73,7 +71,7 @@ export default class Client{
 	async sendVerification(userId: string){
 		const req = await this.client.requestVerification(userId);
 		await req.waitFor(() => req.started || req.cancelled);
-		if (req.cancelled) console.log('Verification cancelled by user.');
+		if (req.cancelled) this.logMessage('Verification cancelled by user.');
 		else await this.verificationHandler(req);
 	}
 
@@ -85,7 +83,7 @@ export default class Client{
 				await req.accept();
 			} else await req.waitFor(() => req.started || req.cancelled);
 			if (req.cancelled) {
-				console.log('Verification cancelled.')
+				this.logMessage('Verification cancelled.')
 				return;
 			}
 		}
@@ -125,19 +123,19 @@ export default class Client{
 		});
 		try{
 			await req.verifier.verify();
-			console.log('Verification successful.');
+			this.logMessage('Verification successful.');
 		} catch(e){
-			console.log(e)
-			console.log('Verification cancelled.');
+			this.logMessage(e)
+			this.logMessage('Verification cancelled.');
 			return;
 		}
 	}
 
-	async sendMessage(roomId: string, message: string){
+	async sendMessage(roomId: string, message: string, retry?: boolean){
 		try{
 			const room = this.client.getRoom(roomId);
 			if(room === null) {
-				console.log(`Invalid room: ${roomId}`);
+				this.logMessage(`Invalid room: ${roomId}`, true);
 				return;
 			}
 			let verifiedMembers = [];
@@ -166,14 +164,16 @@ export default class Client{
 				msgtype: 'm.text',
 			});
 		} catch(e){
+			if (retry) return;
 			if(e instanceof UnknownDeviceError){
-				for(const d in e.devices){
-					this.sendVerification(d);
-				}
-				console.log(e.devices);
-				const room = this.client.getRoom(roomId);
-			}
+				for(const d in e.devices) await this.sendVerification(d);
+			} else await this.sendMessage(roomId, message, true);
 		}
+	}
+
+	async logMessage(message: string, retry?: boolean){
+		if(this.logRoom) await this.sendMessage(this.logRoom, message, retry);
+		else console.log(message);
 	}
 
 	async refreshDMRooms(){
@@ -212,7 +212,7 @@ export default class Client{
 		if (m.membership === 'invite' && m.userId === this.userId) {
 			await this.client.joinRoom(m.roomId);
 			await this.refreshDMRooms();
-			console.log(`Successfully joined ${m.roomId}.`);
+			this.logMessage(`Successfully joined ${m.roomId}.`);
 		}
 	}
 
