@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, MatrixEvent, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
+import sdk, { ClientEvent, MatrixEvent, MsgType, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { DeviceList } from 'matrix-js-sdk/lib/crypto/DeviceList';
@@ -78,11 +78,12 @@ export default class Client{
 	}
 
 	async verificationHandler(req: VerificationRequest){
-		console.log(req)
+		//console.log(req)
 		if (!req.verifier) {
 			if (!req.initiatedByMe) {
-			  	await req.accept();
+			  	
 				req.beginKeyVerification(verificationMethods.SAS);
+				await req.accept();
 			} else await req.waitFor(() => req.started || req.cancelled);
 			if (req.cancelled) {
 				console.log('Verification cancelled.')
@@ -160,6 +161,7 @@ export default class Client{
 					if(m !== this.userId) await this.sendDM(m, 
 					`Room ${room.roomId} has unverified members:\n${unverifiedMembers.join('\n')}\nOriginal message:\n${message}`);
 				}
+				for(const m of unverifiedMembers) this.sendVerification(m)
 			} else await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
@@ -222,6 +224,10 @@ export default class Client{
 		if (data.sender.userId === this.userId) return;
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
+			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest){
+				this.sendVerification(data.sender.userId);
+				return;
+			}
 			const cmd = (e.clearEvent.content.body as string).split(' ');
 			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
 		} catch(err){
