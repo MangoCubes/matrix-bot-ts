@@ -73,12 +73,14 @@ export default function generateConfig(){
 				let password = line;
 				const client = sdk.createClient(config.serverUrl);
 				try{
+					const file = await fs.open('./config/credentials.json', 'w');
 					const res = await client.loginWithPassword(config.userId, password);
 					config.accessToken = res.access_token;
 					config.deviceId = res.device_id;
-					await fs.writeFile('./config/credentials.json', JSON.stringify(config));
+					await file.writeFile(JSON.stringify(config));
 					await fs.mkdir(config.storage, {recursive: true});
 					console.log('File successfully created. Please restart.');
+					await file.close();
 					return;
 				} catch(e){
 					console.log('Cannot login.');
