@@ -2,7 +2,6 @@ import { readFileSync } from 'fs';
 import sdk, { ClientEvent, MatrixEvent, MsgType, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
-import { DeviceList } from 'matrix-js-sdk/lib/crypto/DeviceList';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
 import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
@@ -61,6 +60,7 @@ export default class Client{
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
 					await this.sendMessage(this.logRoom, 'Client started!');
+					console.log('Client started.');
 				}
 			});
 		} catch(e){
