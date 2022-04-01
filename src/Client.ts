@@ -103,6 +103,7 @@ export default class Client{
 		let unverified = [];
 		let verified = [];
 		for(const m of members) {
+			if(m.userId === this.userId) continue;
 			if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
 			else verified.push(m.userId);
 		}
@@ -169,11 +170,11 @@ export default class Client{
 		try{
 			const security = await this.isRoomSafe(roomId);
 			if (security.res) {
-				await this.handleRoomSecurity(roomId, security);
 				if(security.res === 3) {
 					let errMsg = `Message was not sent to ${roomId} because there were unverified users.\nUnverified users:\n${security.unverified.join('\n')}\nOriginal message: \n${message}`;
 					for(const v of security.verified) await this.sendDM(v, errMsg);
 				}
+				await this.handleRoomSecurity(roomId, security);
 				return;
 			}
 			await this.client.sendMessage(roomId, {
@@ -187,19 +188,15 @@ export default class Client{
 	}
 
 	async logMessage(message: string){
-		if(this.logRoom) await this.sendMessage(this.logRoom, message);
-		else console.log(message);
+		console.log(message);
 	}
 
 	async refreshDMRooms(){
-		const rooms = this.client.getRooms();
-		for(const r of rooms){
-			const members = r.getMembers();
-			if(members.length === 2){
-				if(members[0].membership === 'leave' || members[1].membership === 'leave') continue;
-				if(!members[0].getDMInviter() && !members[1].getDMInviter()) continue;
-				if(members[0].userId === this.userId) this.dmRooms[members[1].userId] = r.roomId;
-				else this.dmRooms[members[0].userId] = r.roomId;
+		const dmMap = this.client.getAccountData('m.direct').getContent();
+		for(const u in dmMap){
+			for(const r of dmMap[u]){
+				const room = this.client.getRoom(r);
+				if (room) this.dmRooms[u] = r;
 			}
 		}
 	}
@@ -215,12 +212,13 @@ export default class Client{
 		}
 		if(sec.res === 3) {
 			await this.logMessage(`Room ${roomId} has unverified devices. Sending verifications.`);
-			for(const u in sec.unverified) await this.sendVerification(u);
+			for(const u of sec.unverified) await this.sendVerification(u);
 			return;
 		}
 	}
 
 	async sendDM(userId: string, message: string){
+		console.log('Sending DM to ' + userId)
 		let room = this.dmRooms[userId];
 		try{
 			if(!room){
