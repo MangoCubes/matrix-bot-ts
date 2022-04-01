@@ -167,6 +167,15 @@ export default class Client{
 
 	async sendMessage(roomId: string, message: string){ //Must not throw errors
 		try{
+			const security = await this.isRoomSafe(roomId);
+			if (security.res) {
+				await this.handleRoomSecurity(roomId, security);
+				if(security.res === 3) {
+					let errMsg = `Message was not sent to ${roomId} because there were unverified users.\nUnverified users:\n${security.unverified.join('\n')}\nOriginal message: \n${message}`;
+					for(const v of security.verified) await this.sendDM(v, errMsg);
+				}
+				return;
+			}
 			await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
