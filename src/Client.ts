@@ -44,6 +44,11 @@ export default class Client{
 			await this.client.initCrypto();
 			await this.client.startClient({ initialSyncLimit: 0 });
 			this.client.setGlobalErrorOnUnknownDevices(true);
+			if(!this.client.isCryptoEnabled()){
+				console.log('Crypto not enabled. Quitting.');
+				process.exit(1);
+				return;
+			}
 			
 			this.client.on(CryptoEvent.VerificationRequest, this.verificationHandler.bind(this));
 
@@ -75,25 +80,21 @@ export default class Client{
 		else await this.verificationHandler(req);
 	}
 
-	async checkForUnverifiedUsers(roomId: string){
+	async isUserVerified(userId: string): Promise<boolean>{
+		const devices = this.client.getStoredDevicesForUser(userId);
+		for(const d of devices) if(d.isUnverified()) return false;
+		return true;
+	}
+
+	async canSendMessageTo(roomId: string): Promise<{res: boolean, unverified?: string[]}>{
 		const room = this.client.getRoom(roomId);
-		if (room === null) return null;
-		let verifiedMembers = [];
-		let unverifiedMembers = [];
+		if (room === null) return {res: false};
+		if (!this.client.isRoomEncrypted(roomId)) return {res: false};
 		const members = await room.getEncryptionTargetMembers();
-		for (const m of members) {
-			const devices = this.client.getStoredDevicesForUser(m.userId);
-			let verified = true;
-			for(const d of devices) {
-				if(d.isUnverified()) {
-					verified = false;
-					unverifiedMembers.push(m.userId);
-					break;
-				}
-			}
-			if(verified) verifiedMembers.push(m.userId);
-		}
-		return unverifiedMembers;
+		let unverified = [];
+		for(const m of members) if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
+		if(unverified.length) return {res: false, unverified: unverified};
+		return {res: true};
 	}
 
 	async verificationHandler(req: VerificationRequest){
