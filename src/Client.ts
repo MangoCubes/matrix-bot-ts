@@ -86,15 +86,22 @@ export default class Client{
 		return true;
 	}
 
-	async canSendMessageTo(roomId: string): Promise<{res: boolean, unverified?: string[]}>{
+	/**
+	 * @return {number} 0: Room has encryption enabled, and everyone in the room is verified.
+	 * @return {number} 1: Room does not exist.
+	 * @return {number} 2: Room does not have encryption enabled.
+	 * @return {number} 3: Room has unverified devices. Check unverified property.
+	 */
+
+	async isRoomSafe(roomId: string): Promise<{res: 0 | 1 | 2} | {res: 3, unverified: string[]}>{
 		const room = this.client.getRoom(roomId);
-		if (room === null) return {res: false};
-		if (!this.client.isRoomEncrypted(roomId)) return {res: false};
+		if (room === null) return {res: 1};
+		if (!this.client.isRoomEncrypted(roomId)) return {res: 2};
 		const members = await room.getEncryptionTargetMembers();
 		let unverified = [];
 		for(const m of members) if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
-		if(unverified.length) return {res: false, unverified: unverified};
-		return {res: true};
+		if(unverified.length) return {res: 3, unverified: unverified};
+		return {res: 0};
 	}
 
 	async verificationHandler(req: VerificationRequest){
@@ -195,14 +202,31 @@ export default class Client{
 				this.dmRooms[userId] = roomId.room_id;
 				room = roomId.room_id;
 			}
+			const security = await this.isRoomSafe(room);
+			if(security.res){
+				if(security.res === 1) {
+					console.log(`Room ${room} does not exist.`);
+					return;
+				}
+				if(security.res === 2) {
+					console.log(`Room ${room} has no encryption enabled.`);
+					return;
+				}
+				if(security.res === 3) {
+					console.log(`Room ${room} has unverified devices. Sending verifications.`);
+					for(const u in security.unverified) await this.sendVerification(u);
+					return;
+				}
+			}
 			await this.client.sendMessage(room, {
 				body: message,
 				msgtype: 'm.text',
 			});
-		}catch(e){
+		} catch(e) {
 			if(e instanceof UnknownDeviceError){
-				for(const d in e.devices) this.sendVerification(d);
+				console.log(`Room ${room} has unverified devices.`);
 			}
+			console.log(e);
 		}
 	}
 
