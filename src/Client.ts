@@ -43,13 +43,12 @@ export default class Client{
 		try{
 			await this.client.initCrypto();
 			await this.client.startClient({ initialSyncLimit: 0 });
+			this.client.setGlobalErrorOnUnknownDevices(true);
 			
 			this.client.on(CryptoEvent.VerificationRequest, this.verificationHandler.bind(this));
 
 			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
-			// this.client.on(ClientEvent.ToDeviceEvent, e => {
-			// 	console.log(e)
-			// });
+
 			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
 				if (e.isEncrypted()) await this.messageHandler(room.roomId, e);
 			});
@@ -57,7 +56,7 @@ export default class Client{
 				if(state === 'PREPARED'){
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
-					await this.sendMessage(this.logRoom, 'Client started!', false);
+					await this.logMessage('Client started!', false);
 					console.log('Client started.');
 				}
 			});
@@ -76,15 +75,35 @@ export default class Client{
 		else await this.verificationHandler(req);
 	}
 
+	async checkForUnverifiedUsers(roomId: string){
+		const room = this.client.getRoom(roomId);
+		if (room === null) return null;
+		let verifiedMembers = [];
+		let unverifiedMembers = [];
+		const members = await room.getEncryptionTargetMembers();
+		for (const m of members) {
+			const devices = this.client.getStoredDevicesForUser(m.userId);
+			let verified = true;
+			for(const d of devices) {
+				if(d.isUnverified()) {
+					verified = false;
+					unverifiedMembers.push(m.userId);
+					break;
+				}
+			}
+			if(verified) verifiedMembers.push(m.userId);
+		}
+		return unverifiedMembers;
+	}
+
 	async verificationHandler(req: VerificationRequest){
-		console.log(req)
 		if (!req.verifier) {
 			if (!req.initiatedByMe) {
 				req.beginKeyVerification(verificationMethods.SAS);
 				await req.accept();
 			} else await req.waitFor(() => req.started || req.cancelled);
 			if (req.cancelled) {
-				this.logMessage('Verification cancelled.', false);
+				await this.logMessage('Verification cancelled.', false);
 				return;
 			}
 		}
@@ -134,47 +153,17 @@ export default class Client{
 
 	async sendMessage(roomId: string, message: string, sendingErrorMessage: boolean){ //Must not throw errors
 		try{
-			const room = this.client.getRoom(roomId);
-			if(room === null) {
-				this.logMessage(`Invalid room: ${roomId}`, true);
-				return;
-			}
-			let verifiedMembers = [];
-			let unverifiedMembers = [];
-			const members = await room.getEncryptionTargetMembers();
-			for (const m of members) {
-				const devices = this.client.getStoredDevicesForUser(m.userId);
-				let verified = true;
-				for(const d of devices) {
-					if(d.isUnverified()) {
-						verified = false;
-						unverifiedMembers.push(m.userId);
-						break;
-					}
-				}
-				if(verified) verifiedMembers.push(m.userId);
-			}
-			if(unverifiedMembers.length) {
-				for(const m of verifiedMembers) {
-					if(m !== this.userId) await this.sendDM(m, 
-						`Room ${room.roomId} has unverified members:\n${unverifiedMembers.join('\n')}\nOriginal message:\n${message}`
-					);
-				}
-				for(const m of unverifiedMembers) this.sendVerification(m);
-			} else {
-				console.log('All members verified: ' + unverifiedMembers.toString())
-				await this.client.sendMessage(roomId, {
-					body: message,
-					msgtype: 'm.text',
-				});
-			}
+			console.log(this.client.getGlobalBlacklistUnverifiedDevices())
+			await this.client.sendMessage(roomId, {
+				body: message,
+				msgtype: 'm.text',
+			});
+			console.log(`Message sent to ${roomId}, content: ${message}.`);
 		} catch(e){
+			if(e instanceof UnknownDeviceError) for(const d in e.devices) await this.sendVerification(d);
 			if (sendingErrorMessage) {
 				console.log(message);
 				return;
-			}
-			if(e instanceof UnknownDeviceError){
-				for(const d in e.devices) await this.sendVerification(d);
 			} else await this.sendMessage(roomId, message, true);
 		}
 	}

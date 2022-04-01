@@ -16,7 +16,7 @@ async function main(){
 		await client.init();
 		app.set('client', client);
 		app.get('/', async (req, res) => {
-			await client.logMessage('Heard!');
+			await client.logMessage('Heard!', false);
 			res.sendStatus(200);
 		});
 		app.listen(port, () => {
