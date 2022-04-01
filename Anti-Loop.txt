@@ -1,0 +1,14 @@
+On client start
+	Log message
+
+On verification
+	On verification success, log
+	On failure, log
+
+Send message to room or log message
+	If room has no unverified devices, end.
+	If there are, then send PM to each verified users.
+
+Send PM to user
+	If user has no unverified devices, end.
+	If there are, then send verification.

@@ -8,7 +8,7 @@ import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
 import * as readline from 'readline';
 
-type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[]};
+type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
 
 export default class Client{
 	client: sdk.MatrixClient;
@@ -63,7 +63,7 @@ export default class Client{
 				if(state === 'PREPARED'){
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
-					await this.logMessage('Client started!', false);
+					await this.logMessage('Client started!');
 					console.log('Client started.');
 				}
 			});
@@ -78,7 +78,7 @@ export default class Client{
 	async sendVerification(userId: string){
 		const req = await this.client.requestVerification(userId);
 		await req.waitFor(() => req.started || req.cancelled);
-		if (req.cancelled) this.logMessage('Verification cancelled by user.', false);
+		if (req.cancelled) this.logMessage('Verification cancelled by user.');
 		else await this.verificationHandler(req);
 	}
 
@@ -101,8 +101,12 @@ export default class Client{
 		if (!this.client.isRoomEncrypted(roomId)) return {res: 2};
 		const members = await room.getEncryptionTargetMembers();
 		let unverified = [];
-		for(const m of members) if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
-		if(unverified.length) return {res: 3, unverified: unverified};
+		let verified = [];
+		for(const m of members) {
+			if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
+			else verified.push(m.userId);
+		}
+		if(unverified.length) return {res: 3, unverified: unverified, verified: verified};
 		return {res: 0};
 	}
 
@@ -113,7 +117,7 @@ export default class Client{
 				await req.accept();
 			} else await req.waitFor(() => req.started || req.cancelled);
 			if (req.cancelled) {
-				await this.logMessage('Verification cancelled.', false);
+				await this.logMessage('Verification cancelled.');
 				return;
 			}
 		}
@@ -153,32 +157,28 @@ export default class Client{
 		});
 		try{
 			await req.verifier.verify();
-			this.logMessage('Verification successful.', false);
+			this.logMessage('Verification successful.');
 		} catch(e){
-			this.logMessage('Verification cancelled.', true);
-			this.logMessage(e, true);
+			this.logMessage('Verification cancelled.');
+			this.logMessage(e);
 			return;
 		}
 	}
 
-	async sendMessage(roomId: string, message: string, isRetry: boolean){ //Must not throw errors
+	async sendMessage(roomId: string, message: string){ //Must not throw errors
 		try{
-			console.log(this.client.getGlobalBlacklistUnverifiedDevices())
 			await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
 			});
 			console.log(`Message sent to ${roomId}, content: ${message}.`);
 		} catch(e){
-			if (isRetry) {
-				console.log(message);
-				return;
-			} else await this.sendMessage(roomId, message, true);
+			console.log(e);
 		}
 	}
 
-	async logMessage(message: string, isRetry: boolean){
-		if(this.logRoom) await this.sendMessage(this.logRoom, message, isRetry);
+	async logMessage(message: string){
+		if(this.logRoom) await this.sendMessage(this.logRoom, message);
 		else console.log(message);
 	}
 
@@ -197,21 +197,21 @@ export default class Client{
 
 	async handleRoomSecurity(roomId: string, sec: RoomSecurity){
 		if(sec.res === 1) {
-			console.log(`Room ${roomId} does not exist.`);
+			await this.logMessage(`Room ${roomId} does not exist.`);
 			return;
 		}
 		if(sec.res === 2) {
-			console.log(`Room ${roomId} has no encryption enabled.`);
+			await this.logMessage(`Room ${roomId} has no encryption enabled.`);
 			return;
 		}
 		if(sec.res === 3) {
-			console.log(`Room ${roomId} has unverified devices. Sending verifications.`);
+			await this.logMessage(`Room ${roomId} has unverified devices. Sending verifications.`);
 			for(const u in sec.unverified) await this.sendVerification(u);
 			return;
 		}
 	}
 
-	async sendDM(userId: string, message: string, isRetry: boolean){
+	async sendDM(userId: string, message: string){
 		let room = this.dmRooms[userId];
 		try{
 			if(!room){
@@ -240,7 +240,7 @@ export default class Client{
 		if (m.membership === 'invite' && m.userId === this.userId) {
 			await this.client.joinRoom(m.roomId);
 			await this.refreshDMRooms();
-			this.logMessage(`Successfully joined ${m.roomId}.`, false);
+			this.logMessage(`Successfully joined ${m.roomId}.`);
 		}
 	}
 
@@ -251,12 +251,12 @@ export default class Client{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const cmd = (e.clearEvent.content.body as string).split(' ');
-			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1], false);
+			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
 			if(cmd[0] === 'invalidate') {
-				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
+				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id);
 			}
 		} catch(err){
-			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.', false);
+			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
 			else {
 				console.log('Error handling message: ');
 				console.log(err)
