@@ -8,6 +8,8 @@ import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
 import * as readline from 'readline';
 
+type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[]};
+
 export default class Client{
 	client: sdk.MatrixClient;
 	prefix: string;
@@ -93,7 +95,7 @@ export default class Client{
 	 * @return {number} 3: Room has unverified devices. Check unverified property.
 	 */
 
-	async isRoomSafe(roomId: string): Promise<{res: 0 | 1 | 2} | {res: 3, unverified: string[]}>{
+	async isRoomSafe(roomId: string): Promise<RoomSecurity>{
 		const room = this.client.getRoom(roomId);
 		if (room === null) return {res: 1};
 		if (!this.client.isRoomEncrypted(roomId)) return {res: 2};
@@ -159,7 +161,7 @@ export default class Client{
 		}
 	}
 
-	async sendMessage(roomId: string, message: string, sendingErrorMessage: boolean){ //Must not throw errors
+	async sendMessage(roomId: string, message: string, isRetry: boolean){ //Must not throw errors
 		try{
 			console.log(this.client.getGlobalBlacklistUnverifiedDevices())
 			await this.client.sendMessage(roomId, {
@@ -168,16 +170,15 @@ export default class Client{
 			});
 			console.log(`Message sent to ${roomId}, content: ${message}.`);
 		} catch(e){
-			if(e instanceof UnknownDeviceError) for(const d in e.devices) await this.sendVerification(d);
-			if (sendingErrorMessage) {
+			if (isRetry) {
 				console.log(message);
 				return;
 			} else await this.sendMessage(roomId, message, true);
 		}
 	}
 
-	async logMessage(message: string, sendingErrorMessage: boolean){
-		if(this.logRoom) await this.sendMessage(this.logRoom, message, sendingErrorMessage);
+	async logMessage(message: string, isRetry: boolean){
+		if(this.logRoom) await this.sendMessage(this.logRoom, message, isRetry);
 		else console.log(message);
 	}
 
@@ -194,7 +195,23 @@ export default class Client{
 		}
 	}
 
-	async sendDM(userId: string, message: string){
+	async handleRoomSecurity(roomId: string, sec: RoomSecurity){
+		if(sec.res === 1) {
+			console.log(`Room ${roomId} does not exist.`);
+			return;
+		}
+		if(sec.res === 2) {
+			console.log(`Room ${roomId} has no encryption enabled.`);
+			return;
+		}
+		if(sec.res === 3) {
+			console.log(`Room ${roomId} has unverified devices. Sending verifications.`);
+			for(const u in sec.unverified) await this.sendVerification(u);
+			return;
+		}
+	}
+
+	async sendDM(userId: string, message: string, isRetry: boolean){
 		let room = this.dmRooms[userId];
 		try{
 			if(!room){
@@ -203,20 +220,9 @@ export default class Client{
 				room = roomId.room_id;
 			}
 			const security = await this.isRoomSafe(room);
-			if(security.res){
-				if(security.res === 1) {
-					console.log(`Room ${room} does not exist.`);
-					return;
-				}
-				if(security.res === 2) {
-					console.log(`Room ${room} has no encryption enabled.`);
-					return;
-				}
-				if(security.res === 3) {
-					console.log(`Room ${room} has unverified devices. Sending verifications.`);
-					for(const u in security.unverified) await this.sendVerification(u);
-					return;
-				}
+			if (security.res) {
+				await this.handleRoomSecurity(room, security);
+				return;
 			}
 			await this.client.sendMessage(room, {
 				body: message,
