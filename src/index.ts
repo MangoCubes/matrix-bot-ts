@@ -1,12 +1,12 @@
 import Client from './Client';
-import Olm from 'olm';
+import Olm from '@matrix-org/olm';
 import { logger } from 'matrix-js-sdk/lib/logger';
 import * as fs from 'fs';
 import generateConfig from './generateConfig';
 import express from 'express';
 
 async function main(){
-	logger.disableAll();
+	//logger.disableAll();
 	global.Olm = Olm;
 	if(!fs.existsSync('./config/credentials.json')) generateConfig();
 	else {

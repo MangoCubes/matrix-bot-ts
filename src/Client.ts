@@ -1,11 +1,12 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, MatrixEvent, MsgType, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
+import sdk, { ClientEvent, MatrixEvent, MemoryStore, MsgType, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
 import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
+import path from 'path';
 import * as readline from 'readline';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
@@ -21,17 +22,19 @@ export default class Client{
 	dmRooms: {[rid: string]: string};
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
-		const localStorage = new LocalStorage(config.storage);
+		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(path.join(config.storage, 'crypto')));
+		const sessionStore = new LocalStorageCryptoStore(new LocalStorage(path.join(config.storage, 'session')));
 		this.debugMode = debugMode ? true : false;
 		this.client = sdk.createClient({
 			baseUrl: config.serverUrl,
 			accessToken: config.accessToken,
-			cryptoStore: new LocalStorageCryptoStore(localStorage),
-			sessionStore: {
-				getLocalTrustedBackupPubKey: () => null,
-			},
+			cryptoStore: cryptoStore,
+			sessionStore: sessionStore,
 			userId: config.userId,
 			deviceId: config.deviceId,
+			cryptoCallbacks: {
+
+			}
 		});
 		this.prefix = config.prefix;
 		this.deviceId = config.deviceId;
@@ -67,9 +70,7 @@ export default class Client{
 					console.log('Client started.');
 				}
 			});
-			// this.client.on('event', (e) => {
-			// 	console.log(e)
-			// })
+			
 		} catch(e){
 			console.log('Unable to start client: ' + e);
 		}
@@ -121,6 +122,7 @@ export default class Client{
 				return;
 			}
 		}
+		
 		req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
 			if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
 			if (e.sas.emoji){
@@ -172,8 +174,8 @@ export default class Client{
 				if(security.res === 3) {
 					let errMsg = `Message was not sent to ${roomId} because there were unverified users.\nUnverified users:\n${security.unverified.join('\n')}\nOriginal message: \n${message}`;
 					for(const v of security.verified) await this.sendDM(v, errMsg);
+					for(const u of security.unverified) await this.sendVerification(u);
 				}
-				await this.handleRoomSecurity(roomId, security);
 				return;
 			}
 			await this.client.sendMessage(roomId, {
@@ -202,22 +204,6 @@ export default class Client{
 		}
 	}
 
-	async handleRoomSecurity(roomId: string, sec: RoomSecurity){
-		if(sec.res === 1) {
-			await this.logMessage(`Room ${roomId} does not exist.`);
-			return;
-		}
-		if(sec.res === 2) {
-			await this.logMessage(`Room ${roomId} has no encryption enabled.`);
-			return;
-		}
-		if(sec.res === 3) {
-			await this.logMessage(`Room ${roomId} has unverified devices. Sending verifications.`);
-			for(const u of sec.unverified) await this.sendVerification(u);
-			return;
-		}
-	}
-
 	async sendDM(userId: string, message: string){
 		if(userId === this.userId) return;
 		let room = this.dmRooms[userId];
@@ -229,7 +215,7 @@ export default class Client{
 			}
 			const security = await this.isRoomSafe(room);
 			if (security.res) {
-				await this.handleRoomSecurity(room, security);
+				if(security.res === 3) await this.sendVerification(userId);
 				return;
 			}
 			await this.client.sendMessage(room, {
@@ -261,7 +247,7 @@ export default class Client{
 			const cmd = (e.clearEvent.content.body as string).split(' ');
 			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
 			if(cmd[0] === 'invalidate') {
-				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id);
+				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
 			}
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
