@@ -103,7 +103,6 @@ export default class Client{
 		let unverified = [];
 		let verified = [];
 		for(const m of members) {
-			if(m.userId === this.userId) continue;
 			if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
 			else verified.push(m.userId);
 		}
@@ -183,7 +182,7 @@ export default class Client{
 			});
 			console.log(`Message sent to ${roomId}, content: ${message}.`);
 		} catch(e){
-			console.log(e);
+			console.log(187, e);
 		}
 	}
 
@@ -192,7 +191,9 @@ export default class Client{
 	}
 
 	async refreshDMRooms(){
-		const dmMap = this.client.getAccountData('m.direct').getContent();
+		const accountData = this.client.getAccountData('m.direct');
+		if(!accountData) return;
+		const dmMap = accountData.getContent();
 		for(const u in dmMap){
 			for(const r of dmMap[u]){
 				const room = this.client.getRoom(r);
@@ -218,7 +219,7 @@ export default class Client{
 	}
 
 	async sendDM(userId: string, message: string){
-		console.log('Sending DM to ' + userId)
+		if(userId === this.userId) return;
 		let room = this.dmRooms[userId];
 		try{
 			if(!room){
