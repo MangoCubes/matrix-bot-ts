@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, MatrixEvent, MemoryStore, MsgType, Preset, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
@@ -20,6 +20,7 @@ export default class Client{
 	token: string;
 	logRoom: string;
 	dmRooms: {[rid: string]: string};
+	domain: string;
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(path.join(config.storage, 'crypto')));
@@ -41,6 +42,7 @@ export default class Client{
 		this.userId = config.userId;
 		this.token = config.accessToken;
 		this.logRoom = config.logRoom;
+		this.domain = config.domain;
 		this.dmRooms = {};
 	}
 
@@ -204,6 +206,47 @@ export default class Client{
 		}
 	}
 
+	async createSubRoom(name: string, sender: string, parent: string, suggest: boolean, autoJoin: boolean){
+		try{
+			const roomId = await this.client.createRoom({
+				visibility: Visibility.Public,
+				name: name,
+				invite: [sender],
+				room_version: '9',
+				preset: Preset.PublicChat,
+				initial_state: [
+					{
+						type: EventType.SpaceParent,
+						state_key: parent,
+						content: {
+							via: [this.domain],
+							canonical: true
+						}
+					},
+					{
+						type: EventType.RoomJoinRules,
+						content: {
+							join_rule: JoinRule.Restricted,
+    						allow: [
+      							{
+        							type: RestrictedAllowType.RoomMembership,
+        							room_id: parent
+      							}
+    						]
+						}
+					}
+				]
+			});
+			await this.client.sendStateEvent(parent, EventType.SpaceChild, {
+				suggested: suggest,
+        		auto_join: autoJoin,
+				via: [this.domain],
+			}, roomId.room_id);
+		} catch (e) { 
+			console.log(e)
+		}
+	}
+
 	async logMessage(message: string){
 		console.log(message);
 	}
@@ -261,6 +304,7 @@ export default class Client{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const cmd = (e.clearEvent.content.body as string).split(' ');
+			//if(cmd[0] === 'test') this.createSubRoom('Take6', data.sender.userId, '!brvTWpTACzvFeVwNYi:skew.ch', false, false);
 			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
 			if(cmd[0] === 'invalidate') {
 				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
