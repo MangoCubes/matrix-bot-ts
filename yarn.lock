@@ -9,6 +9,11 @@
   dependencies:
     regenerator-runtime "^0.13.4"
 
+"@matrix-org/olm@^3.2.8":
+  version "3.2.8"
+  resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.8.tgz#8d53636d045e1776e2a2ec6613e57330dd9ce856"
+  integrity sha1-jVNjbQReF3biouxmE+VzMN2c6FY=
+
 "@types/body-parser@*":
   version "1.19.2"
   resolved "https://registry.yarnpkg.com/@types/body-parser/-/body-parser-1.19.2.tgz#aea2059e28b7658639081347ac4fab3de166e6f0"
@@ -878,11 +883,6 @@ object-inspect@^1.9.0:
   version "1.12.0"
   resolved "https://registry.npmjs.org/object-inspect/-/object-inspect-1.12.0.tgz"
   integrity sha512-Ho2z80bVIvJloH+YzRmpZVQe87+qASmBUKZDWgx9cu+KDrX2ZDH/3tMy+gXbZETVGs2M8YdxObOh7XAtim9Y0g==
-
-"olm@https://packages.matrix.org/npm/olm/olm-3.2.1.tgz":
-  version "3.2.1"
-  resolved "https://packages.matrix.org/npm/olm/olm-3.2.1.tgz"
-  integrity sha512-B87bTpGIGieuV2FNauChjjQtVltwTGagQFoHm+3Dcse4amKAAGJB/I54dnP/JtbHZ+RYVoApM2OQ46Z4VH6eNg==
 
 on-finished@~2.3.0:
   version "2.3.0"
