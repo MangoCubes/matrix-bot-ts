@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, MatrixEvent, MemoryStore, MsgType, Preset, Room, RoomEvent, RoomMemberEvent } from 'matrix-js-sdk';
+import sdk, { ClientEvent, MatrixEvent, MemoryStore, MsgType, Preset, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
@@ -188,6 +188,22 @@ export default class Client{
 		}
 	}
 
+	async createSpace(name: string, sender: string, priv: boolean){
+		try{
+			await this.client.createRoom({
+				visibility: priv ? Visibility.Private : Visibility.Public,
+				name: name,
+				invite: [sender],
+				preset: Preset.TrustedPrivateChat,
+				creation_content: {
+					[RoomCreateTypeField]: RoomType.Space
+				}
+			});
+		}catch(e){
+			console.log(e)
+		}
+	}
+
 	async logMessage(message: string){
 		console.log(message);
 	}
@@ -248,6 +264,12 @@ export default class Client{
 			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
 			if(cmd[0] === 'invalidate') {
 				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
+			}
+			if(cmd[0] === 'create'){
+				if(cmd[1] === 'space'){
+					await this.createSpace(cmd[2], data.sender.userId, true);
+					return;
+				}
 			}
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
