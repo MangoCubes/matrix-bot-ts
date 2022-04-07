@@ -9,6 +9,7 @@ import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
 import path from 'path';
 import * as readline from 'readline';
+import Command from './commands/Command';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
 
@@ -68,6 +69,7 @@ export default class Client{
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
 					await this.logMessage('Client started!');
+					await this.runOnStartup();
 					console.log('Client started.');
 				}
 			});
@@ -77,12 +79,32 @@ export default class Client{
 		}
 	}
 
+	async runOnStartup(){
+		const rooms = this.client.getRooms();
+		for(const r of rooms) if(r.isSpaceRoom()) console.log(r)
+	}
+
+	async findSpaceByName(name: string){
+		const rooms = this.client.getRooms();
+		for(const r of rooms) if(r.isSpaceRoom() && r.name === name) return r;
+		return null;
+	}
+
+	async findRoomInSpace(space: string, name: string){
+		const room = await this.findSpaceByName(space);
+		if(!room) return null;
+	}
+
 	async sendVerification(userId: string){
 		const req = await this.client.requestVerification(userId);
 		req.on(VerificationRequestEvent.Change, () => this.handleVerification(req));
 	}
 
 	async handleVerification(req: VerificationRequest) {
+		/**
+		 * Change CrossSigning.js to make this work without error:
+		 * if (!this.callbacks.getCrossSigningKey) { -> if (!shouldCache && !this.callbacks.getCrossSigningKey) {
+		 */
 		if(req.phase === 3){
 			req.beginKeyVerification(verificationMethods.SAS);
 			return;
@@ -123,6 +145,7 @@ export default class Client{
 					});
 				});
 				await req.verifier.verify();
+				console.log('Verification complete.');
 			} catch (err) {
 				console.debug(err);
 			}
@@ -297,6 +320,7 @@ export default class Client{
 			if(cmd[0] === 'invalidate') {
 				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
 			}
+			if(cmd[0] === 'debug') await this.sendMessage(roomId, await Command.debug(this.client, this.client.getRoom(roomId)));
 			if(cmd[0] === 'create'){
 				if(cmd[1] === 'space'){
 					await this.createSpace(cmd[2], data.sender.userId, true);
