@@ -68,8 +68,6 @@ export default class Client{
 				if(state === 'PREPARED'){
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
-					await this.logMessage('Client started!');
-					await this.runOnStartup();
 					console.log('Client started.');
 				}
 			});
@@ -77,9 +75,6 @@ export default class Client{
 		} catch(e){
 			console.log('Unable to start client: ' + e);
 		}
-	}
-
-	async runOnStartup(){
 	}
 
 	async findSpaceByName(name: string){
@@ -99,7 +94,7 @@ export default class Client{
 		return rooms;
 	}
 
-	async findOrCreateRoomInSpace(sender: string, space: string, name: string){
+	async findOrCreateRoomInSpace(space: string, name: string){
 		const room = await this.findSpaceByName(space);
 		if(!room) return null;
 		const roomStates = await this.client.roomState(room.roomId);
@@ -110,7 +105,7 @@ export default class Client{
 				if(child.name === name) return child.roomId;
 			}
 		}
-		return await this.createSubRoom(name, sender, room.roomId, false, false);
+		return await this.createSubRoom(name, room.roomId, false, false);
 	}
 
 	async sendVerification(userId: string){
@@ -235,12 +230,11 @@ export default class Client{
 		}
 	}
 
-	async createSubRoom(name: string, sender: string, parent: string, suggest: boolean, autoJoin: boolean){
+	async createSubRoom(name: string, parent: string, suggest: boolean, autoJoin: boolean){
 		try{
 			const roomId = await this.client.createRoom({
 				visibility: Visibility.Public,
 				name: name,
-				invite: [sender],
 				room_version: '9',
 				preset: Preset.PublicChat,
 				initial_state: [
@@ -275,10 +269,6 @@ export default class Client{
 		} catch (e) { 
 			console.log(e)
 		}
-	}
-
-	async logMessage(message: string){
-		console.log(message);
 	}
 
 	async refreshDMRooms(){
@@ -323,7 +313,7 @@ export default class Client{
 		if (m.membership === 'invite' && m.userId === this.userId) {
 			await this.client.joinRoom(m.roomId);
 			await this.refreshDMRooms();
-			this.logMessage(`Successfully joined ${m.roomId}.`);
+			console.log(`Successfully joined ${m.roomId}.`);
 		}
 	}
 

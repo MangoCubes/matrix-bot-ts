@@ -4,6 +4,7 @@ import { logger } from 'matrix-js-sdk/lib/logger';
 import * as fs from 'fs';
 import generateConfig from './generateConfig';
 import express from 'express';
+import Handler from './handlers/Handler';
 
 async function main(){
 	logger.disableAll();
@@ -15,10 +16,7 @@ async function main(){
 		const port = 8888;
 		await client.init();
 		app.set('client', client);
-		app.get('/', async (req, res) => {
-			await client.logMessage('Heard!');
-			res.sendStatus(200);
-		});
+		app.post('/sms/:number', Handler.receivedSms);
 		app.listen(port, () => {
             console.log(`Listening on port ${port}`);
         });
