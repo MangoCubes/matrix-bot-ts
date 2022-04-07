@@ -68,7 +68,6 @@ export default class Client{
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
 					await this.logMessage('Client started!');
-					await this.client.setDeviceVerified(this.userId!, 'HUMPPWEWFH', false);
 					console.log('Client started.');
 				}
 			});
@@ -84,49 +83,49 @@ export default class Client{
 	}
 
 	async handleVerification(req: VerificationRequest) {
-		let verifier = req.verifier;
-		if (!req.verifier) {
-			verifier = req.beginKeyVerification(verificationMethods.SAS);
-			if(!verifier.initiatedByMe) await req.accept();
-		}
-		try {
-			req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
-				if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
-				if (e.sas.emoji){
-					let emojis = [];
-					for(const emoji of e.sas.emoji) emojis.push(`${emoji[0]} (${emoji[1]})`);
-					console.log(`Emojis: ${emojis.join(', ')}`);
-				}
-				const rl = readline.createInterface({
-					input: process.stdin,
-					output: process.stdout
-				});
-				rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
-				rl.prompt();
-				rl.on('line', async (line) => {
-					switch(line.trim().toLowerCase()) {
-						case 'y':
-							await e.confirm();
-							console.log('Verified. Please wait until the peer verifies their emoji.');
-							rl.close();
-							return;
-						case 'n':
-							e.mismatch();
-							console.log('Emojis do not match; Communication may be compromised.');
-							rl.close();
-							return;
-						case 'c':
-							e.cancel();
-							console.log('Verification cancelled.');
-							rl.close();
-							return;
+		if(req.phase === 3){
+			req.beginKeyVerification(verificationMethods.SAS);
+			return;
+		} else if(req.phase === 4){
+			try {
+				req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
+					if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
+					if (e.sas.emoji){
+						let emojis = [];
+						for(const emoji of e.sas.emoji) emojis.push(`${emoji[0]} (${emoji[1]})`);
+						console.log(`Emojis: ${emojis.join(', ')}`);
 					}
+					const rl = readline.createInterface({
+						input: process.stdin,
+						output: process.stdout
+					});
+					rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
 					rl.prompt();
+					rl.on('line', async (line) => {
+						switch(line.trim().toLowerCase()) {
+							case 'y':
+								await e.confirm();
+								console.log('Verified. Please wait until the peer verifies their emoji.');
+								rl.close();
+								return;
+							case 'n':
+								e.mismatch();
+								console.log('Emojis do not match; Communication may be compromised.');
+								rl.close();
+								return;
+							case 'c':
+								e.cancel();
+								console.log('Verification cancelled.');
+								rl.close();
+								return;
+						}
+						rl.prompt();
+					});
 				});
-			});
-			await verifier.verify();
-		} catch (err) {
-			console.debug(err);
+				await req.verifier.verify();
+			} catch (err) {
+				console.debug(err);
+			}
 		}
 	}
 
