@@ -80,7 +80,6 @@ export default class Client{
 	}
 
 	async runOnStartup(){
-		console.log(await this.findRoomsInSpace('Bot Management'))
 	}
 
 	async findSpaceByName(name: string){
@@ -98,6 +97,20 @@ export default class Client{
 			if(r.type === EventType.SpaceChild) rooms.push(r.state_key);
 		}
 		return rooms;
+	}
+
+	async findOrCreateRoomInSpace(sender: string, space: string, name: string){
+		const room = await this.findSpaceByName(space);
+		if(!room) return null;
+		const roomStates = await this.client.roomState(room.roomId);
+		for(const r of roomStates){
+			if(r.type === EventType.SpaceChild) {
+				const child = this.client.getRoom(r.state_key);
+				if(!child) continue;
+				if(child.name === name) return child.roomId;
+			}
+		}
+		return await this.createSubRoom(name, sender, room.roomId, false, false);
 	}
 
 	async sendVerification(userId: string){
@@ -258,6 +271,7 @@ export default class Client{
         		auto_join: autoJoin,
 				via: [this.domain],
 			}, roomId.room_id);
+			return roomId;
 		} catch (e) { 
 			console.log(e)
 		}
