@@ -265,9 +265,10 @@ export default class Client{
         		auto_join: autoJoin,
 				via: [this.domain],
 			}, roomId.room_id);
-			return roomId;
+			return roomId.room_id;
 		} catch (e) { 
 			console.log(e)
+			return null;
 		}
 	}
 
