@@ -1,9 +1,10 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, MemoryStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
 import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
-import { VerificationRequest } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
+import { VerificationEvent } from 'matrix-js-sdk/lib/crypto/verification/Base';
+import { VerificationRequest, VerificationRequestEvent } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
 import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
 import path from 'path';
@@ -24,7 +25,7 @@ export default class Client{
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(path.join(config.storage, 'crypto')));
-		const sessionStore = new LocalStorageCryptoStore(new LocalStorage(path.join(config.storage, 'session')));
+		const sessionStore = new MemoryCryptoStore();
 		this.debugMode = debugMode ? true : false;
 		this.client = sdk.createClient({
 			baseUrl: config.serverUrl,
@@ -33,9 +34,7 @@ export default class Client{
 			sessionStore: sessionStore,
 			userId: config.userId,
 			deviceId: config.deviceId,
-			cryptoCallbacks: {
-
-			}
+			verificationMethods: ['m.sas.v1'],
 		});
 		this.prefix = config.prefix;
 		this.deviceId = config.deviceId;
@@ -57,7 +56,7 @@ export default class Client{
 				return;
 			}
 			
-			this.client.on(CryptoEvent.VerificationRequest, this.verificationHandler.bind(this));
+			this.client.on(CryptoEvent.VerificationRequest, this.handleVerification.bind(this));
 
 			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
 
@@ -69,6 +68,7 @@ export default class Client{
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
 					await this.logMessage('Client started!');
+					await this.client.setDeviceVerified(this.userId!, 'HUMPPWEWFH', false);
 					console.log('Client started.');
 				}
 			});
@@ -80,9 +80,54 @@ export default class Client{
 
 	async sendVerification(userId: string){
 		const req = await this.client.requestVerification(userId);
-		await req.waitFor(() => req.started || req.cancelled);
-		if (req.cancelled) this.logMessage('Verification cancelled by user.');
-		else await this.verificationHandler(req);
+		req.on(VerificationRequestEvent.Change, () => this.handleVerification(req));
+	}
+
+	async handleVerification(req: VerificationRequest) {
+		let verifier = req.verifier;
+		if (!req.verifier) {
+			verifier = req.beginKeyVerification(verificationMethods.SAS);
+			if(!verifier.initiatedByMe) await req.accept();
+		}
+		try {
+			req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
+				if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
+				if (e.sas.emoji){
+					let emojis = [];
+					for(const emoji of e.sas.emoji) emojis.push(`${emoji[0]} (${emoji[1]})`);
+					console.log(`Emojis: ${emojis.join(', ')}`);
+				}
+				const rl = readline.createInterface({
+					input: process.stdin,
+					output: process.stdout
+				});
+				rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
+				rl.prompt();
+				rl.on('line', async (line) => {
+					switch(line.trim().toLowerCase()) {
+						case 'y':
+							await e.confirm();
+							console.log('Verified. Please wait until the peer verifies their emoji.');
+							rl.close();
+							return;
+						case 'n':
+							e.mismatch();
+							console.log('Emojis do not match; Communication may be compromised.');
+							rl.close();
+							return;
+						case 'c':
+							e.cancel();
+							console.log('Verification cancelled.');
+							rl.close();
+							return;
+					}
+					rl.prompt();
+				});
+			});
+			await verifier.verify();
+		} catch (err) {
+			console.debug(err);
+		}
 	}
 
 	async isUserVerified(userId: string): Promise<boolean>{
@@ -113,70 +158,14 @@ export default class Client{
 		return {res: 0};
 	}
 
-	async verificationHandler(req: VerificationRequest){
-		if (!req.verifier) {
-			if (!req.initiatedByMe) {
-				req.beginKeyVerification(verificationMethods.SAS);
-				await req.accept();
-			} else await req.waitFor(() => req.started || req.cancelled);
-			if (req.cancelled) {
-				await this.logMessage('Verification cancelled.');
-				return;
-			}
-		}
-		
-		req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
-			if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
-			if (e.sas.emoji){
-				let emojis = [];
-				for(const emoji of e.sas.emoji) emojis.push(`${emoji[0]} (${emoji[1]})`);
-				console.log(`Emojis: ${emojis.join(', ')}`);
-			}
-			const rl = readline.createInterface({
-				input: process.stdin,
-				output: process.stdout
-			});
-			rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
-			rl.prompt();
-			rl.on('line', async (line) => {
-				switch(line.trim().toLowerCase()) {
-					case 'y':
-						await e.confirm();
-						console.log('Verified. Please wait until the peer verifies their emoji.');
-						rl.close();
-						return;
-					case 'n':
-						e.mismatch();
-						console.log('Emojis do not match; Communication may be compromised.');
-						rl.close();
-						return;
-					case 'c':
-						e.cancel();
-						console.log('Verification cancelled.');
-						rl.close();
-						return;
-				}
-				rl.prompt();
-			});
-		});
-		try{
-			await req.verifier.verify();
-			this.logMessage('Verification successful.');
-		} catch(e){
-			this.logMessage('Verification cancelled.');
-			this.logMessage(e);
-			return;
-		}
-	}
-
 	async sendMessage(roomId: string, message: string){ //Must not throw errors
 		try{
 			const security = await this.isRoomSafe(roomId);
 			if (security.res) {
 				if(security.res === 3) {
 					let errMsg = `Message was not sent to ${roomId} because there were unverified users.\nUnverified users:\n${security.unverified.join('\n')}\nOriginal message: \n${message}`;
-					for(const v of security.verified) await this.sendDM(v, errMsg);
-					for(const u of security.unverified) await this.sendVerification(u);
+					for(const v of security.verified) this.sendDM(v, errMsg);
+					for(const u of security.unverified) this.sendVerification(u);
 				}
 				return;
 			}
@@ -274,7 +263,7 @@ export default class Client{
 			}
 			const security = await this.isRoomSafe(room);
 			if (security.res) {
-				if(security.res === 3) await this.sendVerification(userId);
+				if(security.res === 3) for(const u of security.unverified) await this.sendVerification(u);
 				return;
 			}
 			await this.client.sendMessage(room, {
