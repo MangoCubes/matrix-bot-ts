@@ -1,14 +1,9 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, MemoryStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
-import { CryptoEvent, verificationMethods } from 'matrix-js-sdk/lib/crypto';
-import { DecryptionError, UnknownDeviceError } from 'matrix-js-sdk/lib/crypto/algorithms';
+import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
-import { VerificationEvent } from 'matrix-js-sdk/lib/crypto/verification/Base';
-import { VerificationRequest, VerificationRequestEvent } from 'matrix-js-sdk/lib/crypto/verification/request/VerificationRequest';
-import { ISasEvent, SasEvent } from 'matrix-js-sdk/lib/crypto/verification/SAS';
 import { LocalStorage } from 'node-localstorage';
 import path from 'path';
-import * as readline from 'readline';
 import Command from './commands/Command';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
@@ -50,14 +45,11 @@ export default class Client{
 		try{
 			await this.client.initCrypto();
 			await this.client.startClient({ initialSyncLimit: 0 });
-			this.client.setGlobalErrorOnUnknownDevices(true);
+			this.client.setGlobalErrorOnUnknownDevices(false);
 			if(!this.client.isCryptoEnabled()){
 				console.log('Crypto not enabled. Quitting.');
 				process.exit(1);
-				return;
 			}
-			
-			this.client.on(CryptoEvent.VerificationRequest, this.handleVerification.bind(this));
 
 			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
 
@@ -108,63 +100,6 @@ export default class Client{
 		return await this.createSubRoom(name, room.roomId, false, false);
 	}
 
-	async sendVerification(userId: string){
-		const req = await this.client.requestVerification(userId);
-		req.on(VerificationRequestEvent.Change, () => this.handleVerification(req));
-	}
-
-	async handleVerification(req: VerificationRequest) {
-		/**
-		 * Change CrossSigning.js to make this work without error:
-		 * if (!this.callbacks.getCrossSigningKey) { -> if (!shouldCache && !this.callbacks.getCrossSigningKey) {
-		 */
-		if(req.phase === 3){
-			req.beginKeyVerification(verificationMethods.SAS);
-			return;
-		} else if(req.phase === 4){
-			try {
-				req.verifier.once(SasEvent.ShowSas, async (e: ISasEvent) => {
-					if (e.sas.decimal) console.log(`Decimal: ${e.sas.decimal.join(', ')}`);
-					if (e.sas.emoji){
-						let emojis = [];
-						for(const emoji of e.sas.emoji) emojis.push(`${emoji[0]} (${emoji[1]})`);
-						console.log(`Emojis: ${emojis.join(', ')}`);
-					}
-					const rl = readline.createInterface({
-						input: process.stdin,
-						output: process.stdout
-					});
-					rl.setPrompt('Do the emojis/decimals match? (c: Cancel) [y/n/c]: ');
-					rl.prompt();
-					rl.on('line', async (line) => {
-						switch(line.trim().toLowerCase()) {
-							case 'y':
-								await e.confirm();
-								console.log('Verified. Please wait until the peer verifies their emoji.');
-								rl.close();
-								return;
-							case 'n':
-								e.mismatch();
-								console.log('Emojis do not match; Communication may be compromised.');
-								rl.close();
-								return;
-							case 'c':
-								e.cancel();
-								console.log('Verification cancelled.');
-								rl.close();
-								return;
-						}
-						rl.prompt();
-					});
-				});
-				await req.verifier.verify();
-				console.log('Verification complete.');
-			} catch (err) {
-				console.debug(err);
-			}
-		}
-	}
-
 	async isUserVerified(userId: string): Promise<boolean>{
 		const devices = this.client.getStoredDevicesForUser(userId);
 		for(const d of devices) if(d.isUnverified()) return false;
@@ -182,26 +117,14 @@ export default class Client{
 		const room = this.client.getRoom(roomId);
 		if (room === null) return {res: 1};
 		if (!this.client.isRoomEncrypted(roomId)) return {res: 2};
-		const members = await room.getEncryptionTargetMembers();
-		let unverified = [];
-		let verified = [];
-		for(const m of members) {
-			if(!(await this.isUserVerified(m.userId))) unverified.push(m.userId);
-			else verified.push(m.userId);
-		}
-		if(unverified.length) return {res: 3, unverified: unverified, verified: verified};
 		return {res: 0};
 	}
 
-	async sendMessage(roomId: string, message: string){ //Must not throw errors
+	async sendMessage(roomId: string, message: string, ){ //Must not throw errors
 		try{
 			const security = await this.isRoomSafe(roomId);
 			if (security.res) {
-				if(security.res === 3) {
-					let errMsg = `Message was not sent to ${roomId} because there were unverified users.\nUnverified users:\n${security.unverified.join('\n')}\nOriginal message: \n${message}`;
-					for(const v of security.verified) this.sendDM(v, errMsg);
-					for(const u of security.unverified) this.sendVerification(u);
-				}
+				console.log(security);
 				return;
 			}
 			await this.client.sendMessage(roomId, {
@@ -295,7 +218,7 @@ export default class Client{
 			}
 			const security = await this.isRoomSafe(room);
 			if (security.res) {
-				if(security.res === 3) for(const u of security.unverified) await this.sendVerification(u);
+				console.log(security);
 				return;
 			}
 			await this.client.sendMessage(room, {
@@ -303,9 +226,6 @@ export default class Client{
 				msgtype: 'm.text',
 			});
 		} catch(e) {
-			if(e instanceof UnknownDeviceError){
-				console.log(`Room ${room} has unverified devices.`);
-			}
 			console.log(e);
 		}
 	}
@@ -325,7 +245,6 @@ export default class Client{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const cmd = (e.clearEvent.content.body as string).split(' ');
-			//if(cmd[0] === 'test') this.createSubRoom('Take6', data.sender.userId, '!brvTWpTACzvFeVwNYi:skew.ch', false, false);
 			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
 			if(cmd[0] === 'invalidate') {
 				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
