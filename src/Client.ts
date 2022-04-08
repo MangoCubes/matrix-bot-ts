@@ -60,6 +60,7 @@ export default class Client{
 				if(state === 'PREPARED'){
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
+					await this.getRootSpaces()
 					console.log('Client started.');
 				}
 			});
@@ -69,14 +70,39 @@ export default class Client{
 		}
 	}
 
-	async findSpaceByName(name: string){
+	async findRoomByDir(dir: string[]){
 		const rooms = this.client.getRooms();
-		for(const r of rooms) if(r.isSpaceRoom() && r.name === name) return r;
-		return null;
+		let roomDict: {[roomId: string]: sdk.Room} = {};
+		let currentRooms = [];
+		for (const r of rooms) roomDict[r.roomId] = r;
+
 	}
 
+	async getRootSpaces(){
+		const rooms = this.client.getRooms();
+		let rootSpaces = [];
+		for(const r of rooms){
+			if (!r.isSpaceRoom()) continue;
+			const roomStates = await this.client.roomState(r.roomId);
+			let isRoot = true;
+			for(const s of roomStates){
+				if(s.type === EventType.SpaceParent) {
+					isRoot = false;
+					break;
+				}
+			}
+			if (isRoot) rootSpaces.push(r.roomId);
+		}
+		return rootSpaces;
+	}
+
+	/**
+	 * Finds all rooms in space
+	 * @param space ID of the space
+	 * @returns Room IDs
+	 */
 	async findRoomsInSpace(space: string){
-		const room = await this.findSpaceByName(space);
+		const room = this.client.getRoom(space);
 		if(!room) return null;
 		let rooms = [];
 		const roomStates = await this.client.roomState(room.roomId);
@@ -86,8 +112,14 @@ export default class Client{
 		return rooms;
 	}
 
+	/**
+	 * Find rooms if it exists, or create one within it
+	 * @param space ID of the space
+	 * @param name Name of the room 
+	 * @returns Room ID, whether it's created or found
+	 */
 	async findOrCreateRoomInSpace(space: string, name: string){
-		const room = await this.findSpaceByName(space);
+		const room = this.client.getRoom(space);
 		if(!room) return null;
 		const roomStates = await this.client.roomState(room.roomId);
 		for(const r of roomStates){
@@ -137,12 +169,11 @@ export default class Client{
 		}
 	}
 
-	async createSpace(name: string, sender: string, priv: boolean){
+	async createSpace(name: string){
 		try{
 			await this.client.createRoom({
-				visibility: priv ? Visibility.Private : Visibility.Public,
+				visibility: Visibility.Public,
 				name: name,
-				invite: [sender],
 				preset: Preset.TrustedPrivateChat,
 				creation_content: {
 					[RoomCreateTypeField]: RoomType.Space
@@ -252,7 +283,7 @@ export default class Client{
 			if(cmd[0] === 'debug') await this.sendMessage(roomId, await Command.debug(this.client, this.client.getRoom(roomId)));
 			if(cmd[0] === 'create'){
 				if(cmd[1] === 'space'){
-					await this.createSpace(cmd[2], data.sender.userId, true);
+					await this.createSpace(cmd[2]);
 					return;
 				}
 			}
