@@ -60,7 +60,7 @@ export default class Client{
 				if(state === 'PREPARED'){
 					await this.client.uploadKeys();
 					await this.refreshDMRooms();
-					await this.getRootSpaces()
+					console.log(await this.findRoomByDir(['24383', '123', '15', 'ABCD']));
 					console.log('Client started.');
 				}
 			});
@@ -73,9 +73,20 @@ export default class Client{
 	async findRoomByDir(dir: string[]){
 		const rooms = this.client.getRooms();
 		let roomDict: {[roomId: string]: sdk.Room} = {};
-		let currentRooms = [];
+		let currentRooms = await this.getRootSpaces();
 		for (const r of rooms) roomDict[r.roomId] = r;
-
+		for (let i = 0; i < dir.length; i++) {
+			for(const r of currentRooms){
+				if(roomDict[r] && roomDict[r].name === dir[i]){
+					if (i === dir.length - 1) return r;
+					const children = await this.findRoomsInSpace(r);
+					if(!children) return null;
+					currentRooms = children;
+					break;
+				}
+			}
+		}
+		return null;
 	}
 
 	async getRootSpaces(){
