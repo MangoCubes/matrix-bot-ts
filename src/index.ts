@@ -15,8 +15,10 @@ async function main(){
 		const client = new Client('./config/credentials.json', true);
 		const port = 8888;
 		await client.init();
+		app.use(express.json());
 		app.set('client', client);
 		app.post('/sms/:number', Handler.receivedSms);
+		app.post('/notification', Handler.receivedNotification);
 		app.listen(port, () => {
             console.log(`Listening on port ${port}`);
         });
