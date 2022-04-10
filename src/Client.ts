@@ -3,7 +3,6 @@ import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, 
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
-import path from 'path';
 import Command from './commands/Command';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
@@ -20,7 +19,7 @@ export default class Client{
 	domain: string;
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
-		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(path.join(config.storage, 'crypto')));
+		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(config.storage));
 		const sessionStore = new MemoryCryptoStore();
 		this.debugMode = debugMode ? true : false;
 		this.client = sdk.createClient({
@@ -42,32 +41,25 @@ export default class Client{
 	}
 
 	async init(){
-		try{
-			await this.client.initCrypto();
-			await this.client.startClient({ initialSyncLimit: 0 });
-			this.client.setGlobalErrorOnUnknownDevices(false);
-			if(!this.client.isCryptoEnabled()){
-				console.log('Crypto not enabled. Quitting.');
-				process.exit(1);
-			}
-
-			this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
-
-			this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
-				if (e.isEncrypted()) await this.messageHandler(room.roomId, e);
-			});
-			this.client.on(ClientEvent.Sync, async (state, lastState, data) => {
-				if(state === 'PREPARED'){
-					await this.client.uploadKeys();
-					await this.refreshDMRooms();
-					console.log(await this.findRoomByDir(['24383', '123', '15', 'ABCD']));
-					console.log('Client started.');
-				}
-			});
-			
-		} catch(e){
-			console.log('Unable to start client: ' + e);
+		await this.client.initCrypto();
+		await this.client.startClient({ initialSyncLimit: 0 });
+		this.client.setGlobalErrorOnUnknownDevices(false);
+		
+		if(!this.client.isCryptoEnabled()){
+			console.log('Crypto not enabled. Quitting.');
+			process.exit(1);
 		}
+		this.client.on(RoomMemberEvent.Membership, this.membershipHandler.bind(this));
+		this.client.on(RoomEvent.Timeline, async (e: MatrixEvent, room: Room) => {
+			if (e.isEncrypted()) await this.messageHandler(room.roomId, e);
+		});
+		this.client.on(ClientEvent.Sync, async (state, lastState, data) => {
+			if(state === 'PREPARED'){
+				await this.client.uploadKeys();
+				await this.refreshDMRooms();
+				console.log('Client started.');
+			}
+		});
 	}
 
 	async findRoomByDir(dir: string[]){
@@ -153,7 +145,7 @@ export default class Client{
 	 * @return {number} 0: Room has encryption enabled, and everyone in the room is verified.
 	 * @return {number} 1: Room does not exist.
 	 * @return {number} 2: Room does not have encryption enabled.
-	 * @return {number} 3: Room has unverified devices. Check unverified property.
+	 * @return {number} 3: Room has unverified devices. Check unverified property. Not used until I figure out how XS works
 	 */
 
 	async isRoomSafe(roomId: string): Promise<RoomSecurity>{
@@ -164,77 +156,62 @@ export default class Client{
 	}
 
 	async sendMessage(roomId: string, message: string, ){ //Must not throw errors
-		try{
-			const security = await this.isRoomSafe(roomId);
-			if (security.res) {
-				console.log(security);
-				return;
-			}
-			await this.client.sendMessage(roomId, {
-				body: message,
-				msgtype: 'm.text',
-			});
-			console.log(`Message sent to ${roomId}, content: ${message}.`);
-		} catch(e){
-			console.log(187, e);
+		const security = await this.isRoomSafe(roomId);
+		if (security.res) {
+			console.log(security);
+			return;
 		}
+		await this.client.sendMessage(roomId, {
+			body: message,
+			msgtype: 'm.text',
+		});
 	}
 
 	async createSpace(name: string){
-		try{
-			await this.client.createRoom({
-				visibility: Visibility.Public,
-				name: name,
-				preset: Preset.TrustedPrivateChat,
-				creation_content: {
-					[RoomCreateTypeField]: RoomType.Space
-				}
-			});
-		}catch(e){
-			console.log(e)
-		}
+		await this.client.createRoom({
+			visibility: Visibility.Public,
+			name: name,
+			creation_content: {
+				[RoomCreateTypeField]: RoomType.Space
+			}
+		});
 	}
 
 	async createSubRoom(name: string, parent: string, suggest: boolean, autoJoin: boolean){
-		try{
-			const roomId = await this.client.createRoom({
-				visibility: Visibility.Public,
-				name: name,
-				room_version: '9',
-				preset: Preset.PublicChat,
-				initial_state: [
-					{
-						type: EventType.SpaceParent,
-						state_key: parent,
-						content: {
-							via: [this.domain],
-							canonical: true
-						}
-					},
-					{
-						type: EventType.RoomJoinRules,
-						content: {
-							join_rule: JoinRule.Restricted,
-    						allow: [
-      							{
-        							type: RestrictedAllowType.RoomMembership,
-        							room_id: parent
-      							}
-    						]
-						}
+		const roomId = await this.client.createRoom({
+			visibility: Visibility.Public,
+			name: name,
+			room_version: '9',
+			preset: Preset.PublicChat,
+			initial_state: [
+				{
+					type: EventType.SpaceParent,
+					state_key: parent,
+					content: {
+						via: [this.domain],
+						canonical: true
 					}
-				]
-			});
-			await this.client.sendStateEvent(parent, EventType.SpaceChild, {
-				suggested: suggest,
-        		auto_join: autoJoin,
-				via: [this.domain],
-			}, roomId.room_id);
-			return roomId.room_id;
-		} catch (e) { 
-			console.log(e)
-			return null;
-		}
+				},
+				{
+					type: EventType.RoomJoinRules,
+					content: {
+						join_rule: JoinRule.Restricted,
+    					allow: [
+      						{
+        						type: RestrictedAllowType.RoomMembership,
+        						room_id: parent
+      						}
+    					]
+					}
+				}
+			]
+		});
+		await this.client.sendStateEvent(parent, EventType.SpaceChild, {
+			suggested: suggest,
+        	auto_join: autoJoin,
+			via: [this.domain],
+		}, roomId.room_id);
+		return roomId.room_id;
 	}
 
 	async refreshDMRooms(){
@@ -252,31 +229,30 @@ export default class Client{
 	async sendDM(userId: string, message: string){
 		if(userId === this.userId) return;
 		let room = this.dmRooms[userId];
-		try{
-			if(!room){
-				const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
-				this.dmRooms[userId] = roomId.room_id;
-				room = roomId.room_id;
-			}
-			const security = await this.isRoomSafe(room);
-			if (security.res) {
-				console.log(security);
-				return;
-			}
-			await this.client.sendMessage(room, {
-				body: message,
-				msgtype: 'm.text',
-			});
-		} catch(e) {
-			console.log(e);
+		if(!room){
+			const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
+			this.dmRooms[userId] = roomId.room_id;
+			room = roomId.room_id;
 		}
+		const security = await this.isRoomSafe(room);
+		if (security.res) {
+			console.log(security);
+			return;
+		}
+		await this.client.sendMessage(room, {
+			body: message,
+			msgtype: 'm.text',
+		});
 	}
 
 	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
-		if (m.membership === 'invite' && m.userId === this.userId) {
-			await this.client.joinRoom(m.roomId);
-			await this.refreshDMRooms();
-			console.log(`Successfully joined ${m.roomId}.`);
+		try{
+			if (m.membership === 'invite' && m.userId === this.userId) {
+				await this.client.joinRoom(m.roomId);
+				await this.refreshDMRooms();
+			}
+		} catch(e) {
+			console.log(e);
 		}
 	}
 
