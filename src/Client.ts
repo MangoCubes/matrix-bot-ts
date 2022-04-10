@@ -36,7 +36,7 @@ export default class Client{
 		this.userId = config.userId;
 		this.token = config.accessToken;
 		this.logRoom = config.logRoom;
-		this.domain = config.domain;
+		this.domain = config.serverUrl;
 		this.dmRooms = {};
 	}
 
@@ -62,14 +62,17 @@ export default class Client{
 		});
 	}
 
-	async findRoomByDir(dir: string[]){
+	async findRoomByDir(dir: string[], createIfNotExists: boolean){
 		const rooms = this.client.getRooms();
 		let roomDict: {[roomId: string]: sdk.Room} = {};
 		let currentRooms = await this.getRootSpaces();
+		let parent = '';
 		for (const r of rooms) roomDict[r.roomId] = r;
 		for (let i = 0; i < dir.length; i++) {
+			const isLast = i === dir.length - 1;
+			let found = false;
 			for(const r of currentRooms){
-				if (!roomDict[r]) {
+				if (!roomDict[r]) { //Room exists, but bot has not joined
 					try{
 						const room = await this.client.joinRoom(r);
 						roomDict[r] = room;
@@ -78,13 +81,24 @@ export default class Client{
 						else throw e;
 					}
 				}
-				if(roomDict[r] && roomDict[r].name === dir[i]){
-					if (i === dir.length - 1) return r;
+				if(roomDict[r] && roomDict[r].name === dir[i]){ //Room is found
+					if (isLast) return r;
 					const children = await this.findRoomsInSpace(r);
-					if(!children) return null;
+					if (!children) return null;
 					currentRooms = children;
+					parent = r;
+					found = true;
 					break;
 				}
+			}
+			if (!found) {
+				if(createIfNotExists) { //Room with given name is not found
+					const newRoom = await this.createSubRoom(dir[i], parent, false, false, !isLast);
+					if (isLast) return newRoom;
+					roomDict[newRoom] = await this.client.joinRoom(newRoom);
+					currentRooms = [];
+					parent = newRoom;
+				} else return null;
 			}
 		}
 		return null;
@@ -141,7 +155,7 @@ export default class Client{
 				if(child.name === name) return child.roomId;
 			}
 		}
-		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, false) : null;
+		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, false, false) : null;
 	}
 
 	async isUserVerified(userId: string): Promise<boolean>{
@@ -186,8 +200,8 @@ export default class Client{
 		});
 	}
 
-	async createSubRoom(name: string, parent: string, suggest: boolean, autoJoin: boolean){
-		const roomId = await this.client.createRoom({
+	async createSubRoom(name: string, parent: string, suggest: boolean, autoJoin: boolean, isSpace: boolean){
+		let options: sdk.ICreateRoomOpts = {
 			visibility: Visibility.Public,
 			name: name,
 			room_version: '9',
@@ -214,7 +228,11 @@ export default class Client{
 					}
 				}
 			]
-		});
+		}
+		if(isSpace) options.creation_content = {
+			[RoomCreateTypeField]: RoomType.Space
+		}
+		const roomId = await this.client.createRoom(options);
 		await this.client.sendStateEvent(parent, EventType.SpaceChild, {
 			suggested: suggest,
         	auto_join: autoJoin,
