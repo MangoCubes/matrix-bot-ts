@@ -69,6 +69,15 @@ export default class Client{
 		for (const r of rooms) roomDict[r.roomId] = r;
 		for (let i = 0; i < dir.length; i++) {
 			for(const r of currentRooms){
+				if (!roomDict[r]) {
+					try{
+						const room = await this.client.joinRoom(r);
+						roomDict[r] = room;
+					} catch (e) {
+						if(e.errcode === 'M_UNKNOWN') continue;
+						else throw e;
+					}
+				}
 				if(roomDict[r] && roomDict[r].name === dir[i]){
 					if (i === dir.length - 1) return r;
 					const children = await this.findRoomsInSpace(r);
@@ -121,7 +130,7 @@ export default class Client{
 	 * @param name Name of the room 
 	 * @returns Room ID, whether it's created or found
 	 */
-	async findOrCreateRoomInSpace(space: string, name: string){
+	async findRoomInSpace(space: string, name: string, createIfNotExists: boolean){
 		const room = this.client.getRoom(space);
 		if(!room) return null;
 		const roomStates = await this.client.roomState(room.roomId);
@@ -132,7 +141,7 @@ export default class Client{
 				if(child.name === name) return child.roomId;
 			}
 		}
-		return await this.createSubRoom(name, room.roomId, false, false);
+		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, false) : null;
 	}
 
 	async isUserVerified(userId: string): Promise<boolean>{
@@ -142,10 +151,10 @@ export default class Client{
 	}
 
 	/**
-	 * @return {number} 0: Room has encryption enabled, and everyone in the room is verified.
+	 * @return {number} 0: Room has encryption enabled.
 	 * @return {number} 1: Room does not exist.
 	 * @return {number} 2: Room does not have encryption enabled.
-	 * @return {number} 3: Room has unverified devices. Check unverified property. Not used until I figure out how XS works
+	 * @return {number} 3: Room has unverified devices. Check unverified property. Not used until I figure out how XS works.
 	 */
 
 	async isRoomSafe(roomId: string): Promise<RoomSecurity>{
