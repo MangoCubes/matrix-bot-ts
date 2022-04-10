@@ -66,7 +66,7 @@ export default class Client{
 		const rooms = this.client.getRooms();
 		let roomDict: {[roomId: string]: sdk.Room} = {};
 		let currentRooms = await this.getRootSpaces();
-		let parent = '';
+		let parent: string | null = null;
 		for (const r of rooms) roomDict[r.roomId] = r;
 		for (let i = 0; i < dir.length; i++) {
 			const isLast = i === dir.length - 1;
@@ -93,7 +93,7 @@ export default class Client{
 			}
 			if (!found) {
 				if(createIfNotExists) { //Room with given name is not found
-					const newRoom = await this.createSubRoom(dir[i], parent, false, false, !isLast);
+					const newRoom: string = await this.createSubRoom(dir[i], parent, false, false, !isLast);
 					if (isLast) return newRoom;
 					roomDict[newRoom] = await this.client.joinRoom(newRoom);
 					currentRooms = [];
@@ -191,16 +191,17 @@ export default class Client{
 	}
 
 	async createSpace(name: string){
-		await this.client.createRoom({
+		return (await this.client.createRoom({
 			visibility: Visibility.Public,
 			name: name,
 			creation_content: {
 				[RoomCreateTypeField]: RoomType.Space
 			}
-		});
+		})).room_id;
 	}
 
-	async createSubRoom(name: string, parent: string, suggest: boolean, autoJoin: boolean, isSpace: boolean){
+	async createSubRoom(name: string, parent: string | null, suggest: boolean, autoJoin: boolean, isSpace: boolean){
+		if(!parent) return await this.createSpace(name);
 		let options: sdk.ICreateRoomOpts = {
 			visibility: Visibility.Public,
 			name: name,
