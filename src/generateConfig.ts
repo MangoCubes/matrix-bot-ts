@@ -8,7 +8,8 @@ interface ConfigFile{
 	storage: string,
 	userId: string,
 	deviceId: string,
-	logRoom: string
+	logRoom: string,
+	serverName: string
 }
 
 export default function generateConfig(){
@@ -23,11 +24,13 @@ export default function generateConfig(){
 		storage: '',
 		userId: '',
 		deviceId: '',
-		logRoom: ''
+		logRoom: '',
+		serverName: ''
 	}
 	console.log('No config file found. Creating new one.');
 	let step = 0;
 	let hsUrl = '';
+	let serverName = '';
 	rl.setPrompt('Please enter homeserver URL: ');
 	rl.prompt();
 	rl.on('line', async (line) => {
@@ -42,39 +45,46 @@ export default function generateConfig(){
 				config.serverUrl = url;
 				console.log(url);
 				step = 1;
-				rl.setPrompt('Please enter your username: ');
+				rl.setPrompt('Please enter your server name: ');
 				break;
 			case 1:
+				serverName = line.trim();
+				if(!serverName.length) break;
+				config.serverName = serverName;
+				console.log(serverName);
+				step = 2;
+				rl.setPrompt('Please enter your username: ');
+			case 2:
 				let username = line.trim();
 				if(!username.length) break;
-				if(!username.startsWith('@')) username = `@${username}:${hsUrl}`;
+				if(!username.startsWith('@')) username = `@${username}:${serverName}`;
 				config.userId = username;
 				console.log(username);
-				step = 2;
+				step = 3;
 				rl.setPrompt('Please enter the ID of the room this bot should log into: ');
 				break;
-			case 2:
+			case 3:
 				let roomId = line.trim();
 				if(!roomId.length || !roomId.startsWith('!')) break;
 				config.logRoom = roomId;
 				console.log(roomId);
-				step = 3;
+				step = 4;
 				rl.setPrompt('Please enter path to store cryptographic files: ');
 				break;
-			case 3:
+			case 4:
 				let directory = line.trim();
 				if(!directory.length) break;
 				config.storage = directory;
 				console.log(directory);
-				step = 4;
+				step = 5;
 				rl.setPrompt('Please enter your password: ');
 				break;
-			case 4:
+			case 5:
 				let password = line;
 				const client = sdk.createClient(config.serverUrl);
 				try{
-					const file = await fs.open('./config/credentials.json', 'w');
 					const res = await client.loginWithPassword(config.userId, password);
+					const file = await fs.open('./config/credentials.json', 'w');
 					config.accessToken = res.access_token;
 					config.deviceId = res.device_id;
 					await file.writeFile(JSON.stringify(config));

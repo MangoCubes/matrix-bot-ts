@@ -16,7 +16,7 @@ export default class Client{
 	token: string;
 	logRoom: string;
 	dmRooms: {[rid: string]: string};
-	domain: string;
+	serverName: string;
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(config.storage));
@@ -36,7 +36,7 @@ export default class Client{
 		this.userId = config.userId;
 		this.token = config.accessToken;
 		this.logRoom = config.logRoom;
-		this.domain = config.serverUrl;
+		this.serverName = config.serverName;
 		this.dmRooms = {};
 	}
 
@@ -212,7 +212,7 @@ export default class Client{
 					type: EventType.SpaceParent,
 					state_key: parent,
 					content: {
-						via: [this.domain],
+						via: [this.serverName],
 						canonical: true
 					}
 				},
@@ -237,7 +237,7 @@ export default class Client{
 		await this.client.sendStateEvent(parent, EventType.SpaceChild, {
 			suggested: suggest,
         	auto_join: autoJoin,
-			via: [this.domain],
+			via: [this.serverName],
 		}, roomId.room_id);
 		return roomId.room_id;
 	}
