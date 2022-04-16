@@ -3,7 +3,9 @@ import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, 
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
-import Command from './commands/Command';
+import CommandHandler from './commands/CommandHandler';
+import DebugHandler from './commands/DebugHandler';
+import EchoHandler from './commands/EchoHandler';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
 
@@ -17,6 +19,7 @@ export default class Client{
 	logRoom: string;
 	dmRooms: {[rid: string]: string};
 	serverName: string;
+	handlers: CommandHandler[];
 	constructor(configDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(config.storage));
@@ -38,6 +41,7 @@ export default class Client{
 		this.logRoom = config.logRoom;
 		this.serverName = config.serverName;
 		this.dmRooms = {};
+		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo')];
 	}
 
 	async init(){
@@ -291,14 +295,10 @@ export default class Client{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const cmd = (e.clearEvent.content.body as string).split(' ');
-			if(cmd[0] === 'echo') this.sendMessage(roomId, cmd[1]);
-			if(cmd[0] === 'invalidate') {
-				await this.client.setDeviceVerified(data.sender.userId, data.getContent().device_id, false);
-			}
-			if(cmd[0] === 'debug') await this.sendMessage(roomId, await Command.debug(this.client, this.client.getRoom(roomId)));
-			if(cmd[0] === 'create'){
-				if(cmd[1] === 'space'){
-					await this.createSpace(cmd[2]);
+			for(const h of this.handlers) {
+				if(h.handles(cmd[0])) {
+					cmd.splice(0, 1);
+					await h.respond(cmd, data, e.clearEvent);
 					return;
 				}
 			}

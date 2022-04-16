@@ -14,6 +14,11 @@
   resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.8.tgz#8d53636d045e1776e2a2ec6613e57330dd9ce856"
   integrity sha1-jVNjbQReF3biouxmE+VzMN2c6FY=
 
+"@types/argparse@^2.0.10":
+  version "2.0.10"
+  resolved "https://registry.yarnpkg.com/@types/argparse/-/argparse-2.0.10.tgz#664e84808accd1987548d888b9d21b3e9c996a6c"
+  integrity sha512-C4wahC3gz3vQtvPazrJ5ONwmK1zSDllQboiWvpMM/iOswCYfBREFnjFbq/iWKIVOCl8+m5Pk6eva6/ZSsDuIGA==
+
 "@types/body-parser@*":
   version "1.19.2"
   resolved "https://registry.yarnpkg.com/@types/body-parser/-/body-parser-1.19.2.tgz#aea2059e28b7658639081347ac4fab3de166e6f0"
@@ -122,6 +127,11 @@ another-json@^0.2.0:
   version "0.2.0"
   resolved "https://registry.npmjs.org/another-json/-/another-json-0.2.0.tgz"
   integrity sha1-tfQBnJc7bdXGUGotk0acttMq7tw=
+
+argparse@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/argparse/-/argparse-2.0.1.tgz#246f50f3ca78a3240f6c997e8a9bd1eac49e4b38"
+  integrity sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==
 
 array-flatten@1.1.1:
   version "1.1.1"
