@@ -17,7 +17,7 @@ async function main(){
 		await client.init();
 		app.use(express.json());
 		app.set('client', client);
-		app.post('/sms/:number', Handler.receivedSms);
+		app.post('/chat', Handler.receivedChat);
 		app.post('/notification', Handler.receivedNotification);
 		app.listen(port, () => {
             console.log(`Listening on port ${port}`);

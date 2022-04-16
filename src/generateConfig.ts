@@ -54,6 +54,7 @@ export default function generateConfig(){
 				console.log(serverName);
 				step = 2;
 				rl.setPrompt('Please enter your username: ');
+				break;
 			case 2:
 				let username = line.trim();
 				if(!username.length) break;

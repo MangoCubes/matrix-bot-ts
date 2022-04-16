@@ -17,9 +17,9 @@ export default async function receivedNotification(req: express.Request, res: ex
 			res.json({res: 1, msg: 'Cannot find/create room.'});
 			return;
 		}
-		await client.sendMessage(room, `#### ${n.title}\n${n.body}\n${n.actionNames ? n.actionNames.join('|') + '\n' : ''}`);
+		await client.sendMessage(room, `${n.title}\n${n.body}\n${n.actionNames ? n.actionNames.join('|') + '\n' : ''}`);
 		res.json({res: 0});
 	} catch (e){
-		res.json({res: 2, msg: `Error: ${e}`});
+		res.json({res: -1, msg: `Error: ${e}`});
 	}
 }

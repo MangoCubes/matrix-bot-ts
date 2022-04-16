@@ -1,7 +1,7 @@
 import receivedNotification from "./receivedNotification";
-import receivedSms from "./receivedSms";
+import receivedChat from "./receivedChat";
 
 export default class Handler{
-	static receivedSms = receivedSms;
+	static receivedChat = receivedChat;
 	static receivedNotification = receivedNotification;
 }

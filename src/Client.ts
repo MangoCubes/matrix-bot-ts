@@ -93,7 +93,7 @@ export default class Client{
 			}
 			if (!found) {
 				if(createIfNotExists) { //Room with given name is not found
-					const newRoom: string = await this.createSubRoom(dir[i], parent, false, false, !isLast);
+					const newRoom: string = await this.createSubRoom(dir[i], parent, false, true, !isLast);
 					if (isLast) return newRoom;
 					roomDict[newRoom] = await this.client.joinRoom(newRoom);
 					currentRooms = [];
@@ -155,7 +155,7 @@ export default class Client{
 				if(child.name === name) return child.roomId;
 			}
 		}
-		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, false, false) : null;
+		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, true, false) : null;
 	}
 
 	async isUserVerified(userId: string): Promise<boolean>{
@@ -178,7 +178,7 @@ export default class Client{
 		return {res: 0};
 	}
 
-	async sendMessage(roomId: string, message: string, ){ //Must not throw errors
+	async sendMessage(roomId: string, message: string){
 		const security = await this.isRoomSafe(roomId);
 		if (security.res) {
 			console.log(security);
