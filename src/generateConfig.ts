@@ -86,9 +86,11 @@ export default function generateConfig(){
 				try{
 					const res = await client.loginWithPassword(config.userId, password);
 					const file = await fs.open('./config/credentials.json', 'w');
+					const trusted = await fs.open('./config/trusted.json', 'w');
 					config.accessToken = res.access_token;
 					config.deviceId = res.device_id;
 					await file.writeFile(JSON.stringify(config));
+					await trusted.writeFile(JSON.stringify({trusted: []}));
 					await fs.mkdir(config.storage, {recursive: true});
 					console.log('File successfully created. Please restart.');
 					await file.close();

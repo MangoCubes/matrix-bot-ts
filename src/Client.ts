@@ -21,9 +21,11 @@ export default class Client{
 	logRoom: string;
 	dmRooms: {[rid: string]: string};
 	serverName: string;
+	trusted: string[];
 	handlers: CommandHandler[];
-	constructor(configDir: string, debugMode?: boolean){
+	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
+		const trusted = JSON.parse(readFileSync(trustedDir, 'utf8'));
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(config.storage));
 		const sessionStore = new MemoryCryptoStore();
 		this.debugMode = debugMode ? true : false;
@@ -37,6 +39,7 @@ export default class Client{
 			verificationMethods: ['m.sas.v1'],
 		});
 		this.prefix = config.prefix;
+		this.trusted = trusted.trusted;
 		this.deviceId = config.deviceId;
 		this.userId = config.userId;
 		this.token = config.accessToken;
@@ -306,7 +309,7 @@ export default class Client{
 
 	async messageHandler(roomId: string, data: MatrixEvent){
 		if (data.isRedacted()) return;
-		if (data.sender.userId === this.userId) return;
+		if (data.sender.userId === this.userId || !this.trusted.includes(data.sender.userId)) return;
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;

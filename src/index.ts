@@ -12,7 +12,7 @@ async function main(){
 	if(!fs.existsSync('./config/credentials.json')) generateConfig();
 	else {
 		const app = express();
-		const client = new Client('./config/credentials.json', true);
+		const client = new Client('./config/credentials.json', './config/trusted.json', true);
 		const port = 8888;
 		await client.init();
 		app.use(express.json());
