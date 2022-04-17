@@ -2,8 +2,8 @@ import { IClearEvent, MatrixEvent } from "matrix-js-sdk";
 import Client from "../Client";
 
 export default abstract class CommandHandler{
-	prefix: string;
-	client: Client;
+	readonly prefix: string;
+	readonly client: Client;
 	constructor(client: Client, prefix: string){
 		this.prefix = prefix;
 		this.client = client;

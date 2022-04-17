@@ -6,13 +6,14 @@ import { LocalStorage } from 'node-localstorage';
 import CommandHandler from './commands/CommandHandler';
 import DebugHandler from './commands/DebugHandler';
 import EchoHandler from './commands/EchoHandler';
+import InviteHandler from './commands/InviteHandler';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
 
 export default class Client{
 	client: sdk.MatrixClient;
 	prefix: string;
-	userId: string | null;
+	userId: string;
 	deviceId: string | null;
 	debugMode: boolean;
 	token: string;
@@ -41,7 +42,7 @@ export default class Client{
 		this.logRoom = config.logRoom;
 		this.serverName = config.serverName;
 		this.dmRooms = {};
-		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo')];
+		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite')];
 	}
 
 	async init(){
@@ -192,6 +193,12 @@ export default class Client{
 			body: message,
 			msgtype: 'm.text',
 		});
+	}
+
+	async invite(userId: string){
+		const mainRoom = await this.findRoomByDir([this.userId], true);
+		if(!mainRoom) return;
+		await this.client.invite(mainRoom, userId);
 	}
 
 	async createSpace(name: string){
