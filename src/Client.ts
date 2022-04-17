@@ -266,6 +266,14 @@ export default class Client{
 		}
 	}
 
+	async deleteRoom(roomId: string){
+		const users = await this.client.getJoinedRoomMembers(roomId);
+		for(const u of Object.keys(users.joined)) {
+			if(u !== this.userId) await this.client.kick(roomId, u, 'Purging room.');
+		}
+		await this.client.leave(roomId);
+	}
+
 	async sendDM(userId: string, message: string){
 		if(userId === this.userId) return;
 		let room = this.dmRooms[userId];

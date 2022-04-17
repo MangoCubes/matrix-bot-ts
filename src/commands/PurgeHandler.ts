@@ -14,6 +14,7 @@ export default class InviteHandler extends CommandHandler{
 			if(command[0] === 'yes' && this.inProgress[clear.room_id] === event.getSender()){
 				await this.client.sendMessage(clear.room_id, 'Confirmed.');
 				delete this.inProgress[clear.room_id];
+				await this.client.deleteRoom(clear.room_id);
 			} else {
 				let cancelled = false;
 				if(this.inProgress[clear.room_id]) {
