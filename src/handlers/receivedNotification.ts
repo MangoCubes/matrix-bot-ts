@@ -17,7 +17,9 @@ export default async function receivedNotification(req: express.Request, res: ex
 			res.json({res: 1, msg: 'Cannot find/create room.'});
 			return;
 		}
-		await client.sendMessage(room, `${n.title}\n${n.body}\n${n.actionNames ? n.actionNames.join('|') + '\n' : ''}`);
+		const title = Buffer.from(n.title, 'base64').toString('utf8');
+		const body = Buffer.from(n.body, 'base64').toString('utf8');
+		await client.sendMessage(room, `${title}\n${body}\n${n.actionNames ? n.actionNames.join('|') + '\n' : ''}`);
 		res.json({res: 0});
 	} catch (e){
 		res.json({res: -1, msg: `Error: ${e}`});

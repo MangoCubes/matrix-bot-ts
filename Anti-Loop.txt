@@ -12,3 +12,5 @@ Send message to room or log message
 Send PM to user
 	If user has no unverified devices, end.
 	If there are, then send verification.
+
+npm config set @matrix-org:registry https://gitlab.matrix.org/api/v4/projects/27/packages/npm/
