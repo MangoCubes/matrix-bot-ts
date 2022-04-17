@@ -8,10 +8,5 @@ export default abstract class CommandHandler{
 		this.prefix = prefix;
 		this.client = client;
 	}
-
-	handles(message: string){
-		return message === this.prefix;
-	}
-
-	abstract respond(command: string[], event: MatrixEvent, clear: IClearEvent): Promise<void>;
+	abstract onMessage(command: string[], event: MatrixEvent, clear: IClearEvent): Promise<void>;
 }

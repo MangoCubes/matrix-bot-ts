@@ -7,6 +7,7 @@ import CommandHandler from './commands/CommandHandler';
 import DebugHandler from './commands/DebugHandler';
 import EchoHandler from './commands/EchoHandler';
 import InviteHandler from './commands/InviteHandler';
+import PurgeHandler from './commands/PurgeHandler';
 
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
 
@@ -42,7 +43,7 @@ export default class Client{
 		this.logRoom = config.logRoom;
 		this.serverName = config.serverName;
 		this.dmRooms = {};
-		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite')];
+		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge')];
 	}
 
 	async init(){
@@ -302,13 +303,7 @@ export default class Client{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const cmd = (e.clearEvent.content.body as string).split(' ');
-			for(const h of this.handlers) {
-				if(h.handles(cmd[0])) {
-					cmd.splice(0, 1);
-					await h.respond(cmd, data, e.clearEvent);
-					return;
-				}
-			}
+			for(const h of this.handlers) h.onMessage(cmd, data, e.clearEvent);
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
 			else {
