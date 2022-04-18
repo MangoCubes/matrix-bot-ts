@@ -22,5 +22,5 @@ export default abstract class CommandHandler{
 		}
 		
 	}
-	abstract handleMessage(command: string[], event: MatrixEvent, clear: IClearEvent): Promise<void>;
+	abstract handleMessage(command: readonly string[], event: MatrixEvent, clear: IClearEvent): Promise<void>;
 }

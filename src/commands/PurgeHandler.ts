@@ -8,7 +8,7 @@ export default class InviteHandler extends CommandHandler{
 		super(client, prefix);
 		this.inProgress = {};
 	}
-	async handleMessage(command: string[], event: MatrixEvent, clear: IClearEvent): Promise<void> {
+	async handleMessage(command: readonly string[], event: MatrixEvent, clear: IClearEvent): Promise<void> {
 		if(!clear.room_id) return;
 		if(command[0] === 'yes' && this.inProgress[clear.room_id] === event.getSender()){
 			await this.client.sendMessage(clear.room_id, 'Confirmed.');
