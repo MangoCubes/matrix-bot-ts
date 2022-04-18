@@ -11,13 +11,13 @@ export default abstract class CommandHandler{
 	}
 	async onMessage(command: string[], event: MatrixEvent, clear: IClearEvent): Promise<void>{
 		try{
-			await this.handleMessage(command, event, clear);
+			await this.handleMessage(command, event, clear); //Try sending message back
 		} catch (e) {
-			if(e instanceof MessageError) console.log(e);
+			if(e instanceof MessageError) console.log(e); //If sending fails, print error
 			else try{
-				await this.client.sendDM(event.getSender(), JSON.stringify(e));
+				await this.client.sendDM(event.getSender(), JSON.stringify(e)); //If not, try sending error back
 			} catch(e) {
-				console.log(e);
+				console.log(e); //If that fails, print error instead
 			}
 		}
 		

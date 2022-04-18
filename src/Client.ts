@@ -9,6 +9,7 @@ import DebugHandler from './commands/DebugHandler';
 import EchoHandler from './commands/EchoHandler';
 import InviteHandler from './commands/InviteHandler';
 import PurgeHandler from './commands/PurgeHandler';
+import { ConfigFile, TrustedFile } from './generateConfig';
 
 type RoomCreationOptions = {
 	showHistory: boolean;
@@ -18,19 +19,26 @@ type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: 
 
 export default class Client{
 	client: sdk.MatrixClient;
-	prefix: string;
-	userId: string;
-	deviceId: string | null;
+	config: ConfigFile;
 	debugMode: boolean;
-	token: string;
-	logRoom: string;
 	dmRooms: {[rid: string]: string};
-	serverName: string;
-	trusted: string[];
+	trusted: TrustedFile;
 	handlers: CommandHandler[];
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const trusted = JSON.parse(readFileSync(trustedDir, 'utf8'));
+		this.config = {
+			serverUrl: config.configUrl,
+			accessToken: config.accessToken,
+			storage: config.storage,
+			userId: config.userId,
+			deviceId: config.deviceId,
+			logRoom: config.logRoom,
+			serverName: config.serverName
+		}
+		this.trusted = {
+			trusted: trusted.trusted
+		}
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(config.storage));
 		const sessionStore = new MemoryCryptoStore();
 		this.debugMode = debugMode ? true : false;
@@ -43,13 +51,6 @@ export default class Client{
 			deviceId: config.deviceId,
 			verificationMethods: ['m.sas.v1'],
 		});
-		this.prefix = config.prefix;
-		this.trusted = trusted.trusted;
-		this.deviceId = config.deviceId;
-		this.userId = config.userId;
-		this.token = config.accessToken;
-		this.logRoom = config.logRoom;
-		this.serverName = config.serverName;
 		this.dmRooms = {};
 		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge')];
 	}
@@ -218,7 +219,7 @@ export default class Client{
 	}
 
 	async invite(userId: string){
-		const mainRoom = await this.findRoomByDir([this.userId], {showHistory: false});
+		const mainRoom = await this.findRoomByDir([this.config.userId], {showHistory: false});
 		if(!mainRoom) return;
 		await this.client.invite(mainRoom.roomId, userId);
 	}
@@ -245,7 +246,7 @@ export default class Client{
 					type: EventType.SpaceParent,
 					state_key: parent,
 					content: {
-						via: [this.serverName],
+						via: [this.config.serverName],
 						canonical: true
 					}
 				},
@@ -278,7 +279,7 @@ export default class Client{
 		await this.client.sendStateEvent(parent, EventType.SpaceChild, {
 			suggested: suggest,
         	auto_join: autoJoin,
-			via: [this.serverName],
+			via: [this.config.serverName],
 		}, roomId.room_id);
 		return roomId.room_id;
 	}
@@ -298,13 +299,13 @@ export default class Client{
 	async deleteRoom(roomId: string){
 		const users = await this.client.getJoinedRoomMembers(roomId);
 		for(const u of Object.keys(users.joined)) {
-			if(u !== this.userId) await this.client.kick(roomId, u, 'Purging room.');
+			if(u !== this.config.userId) await this.client.kick(roomId, u, 'Purging room.');
 		}
 		await this.client.leave(roomId);
 	}
 
 	async sendDM(userId: string, message: string){
-		if(userId === this.userId) return;
+		if(userId === this.config.userId) return;
 		let room = this.dmRooms[userId];
 		if(!room){
 			const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
@@ -328,7 +329,7 @@ export default class Client{
 
 	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
 		try{
-			if (m.membership === 'invite' && m.userId === this.userId) {
+			if (m.membership === 'invite' && m.userId === this.config.userId) {
 				await this.client.joinRoom(m.roomId);
 				await this.refreshDMRooms();
 			}
@@ -339,7 +340,7 @@ export default class Client{
 
 	async messageHandler(roomId: string, data: MatrixEvent){
 		if (data.isRedacted()) return;
-		if (data.sender.userId === this.userId || !this.trusted.includes(data.sender.userId)) return;
+		if (data.sender.userId === this.config.userId || !this.trusted.trusted.includes(data.sender.userId)) return;
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;

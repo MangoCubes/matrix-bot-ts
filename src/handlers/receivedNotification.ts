@@ -12,7 +12,7 @@ export default async function receivedNotification(req: express.Request, res: ex
 	try{
 		const client: Client = req.app.get('client');
 		const n: Notification = req.body;
-		const room = await client.findRoomByDir([client.userId!, 'Notification', n.appName], {showHistory: true});
+		const room = await client.findRoomByDir([client.config.userId, 'Notification', n.appName], {showHistory: true});
 		if(!room){
 			res.json({res: 1, msg: 'Cannot find/create room.'});
 			return;

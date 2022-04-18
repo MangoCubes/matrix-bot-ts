@@ -2,7 +2,7 @@ import * as readline from 'readline';
 import sdk from 'matrix-js-sdk';
 import { promises as fs } from 'fs';
 
-interface ConfigFile{
+export interface ConfigFile{
 	serverUrl: string,
 	accessToken: string,
 	storage: string,
@@ -10,6 +10,10 @@ interface ConfigFile{
 	deviceId: string,
 	logRoom: string,
 	serverName: string
+}
+
+export interface TrustedFile{
+	trusted: string[];
 }
 
 export default function generateConfig(){
@@ -27,9 +31,11 @@ export default function generateConfig(){
 		logRoom: '',
 		serverName: ''
 	}
+	let trusted: TrustedFile = {
+		trusted: []
+	}
 	console.log('No config file found. Creating new one.');
 	let step = 0;
-	let hsUrl = '';
 	let serverName = '';
 	rl.setPrompt('Please enter homeserver URL: ');
 	rl.prompt();
@@ -38,10 +44,7 @@ export default function generateConfig(){
 			case 0:
 				let url = line.trim();
 				if(!url.length) break;
-				if(!url.startsWith('http')) {
-					hsUrl = url;
-					url = 'https://' + url;
-				} else hsUrl = url.split('//')[1];
+				if(!url.startsWith('http')) url = 'https://' + url;
 				config.serverUrl = url;
 				console.log(url);
 				step = 1;
@@ -90,7 +93,7 @@ export default function generateConfig(){
 					config.accessToken = res.access_token;
 					config.deviceId = res.device_id;
 					await file.writeFile(JSON.stringify(config));
-					await trusted.writeFile(JSON.stringify({trusted: []}));
+					await trusted.writeFile(JSON.stringify(trusted));
 					await fs.mkdir(config.storage, {recursive: true});
 					console.log('File successfully created. Please restart.');
 					await file.close();

@@ -14,7 +14,7 @@ export default async function sendChat(req: express.Request, res: express.Respon
 	try{
 		const sender = Buffer.from(body.sender, 'base64').toString('utf8');
 		const message = Buffer.from(body.message, 'base64').toString('utf8');
-		const room = await client.findRoomByDir([client.userId!, 'Chat', body.appName, sender], {showHistory: true});
+		const room = await client.findRoomByDir([client.config.userId!, 'Chat', body.appName, sender], {showHistory: true});
 		if(room === null) res.json({res: 1, message: 'Chat room could not be created.'});
 		else {
 			await client.sendMessage(room.roomId, message);
