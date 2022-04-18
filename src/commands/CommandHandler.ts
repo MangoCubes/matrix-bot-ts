@@ -11,6 +11,7 @@ export default abstract class CommandHandler{
 	}
 	async onMessage(command: string[], event: MatrixEvent, clear: IClearEvent): Promise<void>{
 		try{
+			if(!event.getRoomId()) return;
 			await this.handleMessage(command, event, clear); //Try sending message back
 		} catch (e) {
 			if(e instanceof MessageError) console.log(e); //If sending fails, print error

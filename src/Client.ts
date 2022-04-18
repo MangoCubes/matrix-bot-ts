@@ -10,6 +10,9 @@ import EchoHandler from './commands/EchoHandler';
 import InviteHandler from './commands/InviteHandler';
 import PurgeHandler from './commands/PurgeHandler';
 import { ConfigFile, TrustedFile } from './generateConfig';
+import { promises as fs } from 'fs';
+import AddTrustedHandler from './commands/AddTrustedHandler';
+
 
 type RoomCreationOptions = {
 	showHistory: boolean;
@@ -24,7 +27,11 @@ export default class Client{
 	dmRooms: {[rid: string]: string};
 	trusted: TrustedFile;
 	handlers: CommandHandler[];
+	configDir: string;
+	trustedDir: string;
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
+		this.configDir = configDir;
+		this.trustedDir = trustedDir;
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
 		const trusted = JSON.parse(readFileSync(trustedDir, 'utf8'));
 		this.config = {
@@ -52,7 +59,7 @@ export default class Client{
 			verificationMethods: ['m.sas.v1'],
 		});
 		this.dmRooms = {};
-		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge')];
+		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge'), new AddTrustedHandler(this, '!trust')];
 	}
 
 	async init(){
@@ -353,5 +360,14 @@ export default class Client{
 				console.log(err)
 			}
 		}
+	}
+
+	async changeTrustedList(newList: string[]): Promise<void>{
+		this.trusted = {
+			trusted: newList
+		}
+		const file = await fs.open(this.trustedDir, 'w');
+		await file.write(JSON.stringify(this.trusted));
+		await file.close();
 	}
 }

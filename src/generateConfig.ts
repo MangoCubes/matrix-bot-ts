@@ -31,7 +31,7 @@ export default function generateConfig(){
 		logRoom: '',
 		serverName: ''
 	}
-	let trusted: TrustedFile = {
+	let trustedList: TrustedFile = {
 		trusted: []
 	}
 	console.log('No config file found. Creating new one.');
@@ -93,7 +93,7 @@ export default function generateConfig(){
 					config.accessToken = res.access_token;
 					config.deviceId = res.device_id;
 					await file.writeFile(JSON.stringify(config));
-					await trusted.writeFile(JSON.stringify(trusted));
+					await trusted.writeFile(JSON.stringify(trustedList));
 					await fs.mkdir(config.storage, {recursive: true});
 					console.log('File successfully created. Please restart.');
 					await file.close();
