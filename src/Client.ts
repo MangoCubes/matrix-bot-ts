@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import sdk, { ClientEvent, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
@@ -87,8 +87,10 @@ export default class Client{
 						const room = await this.client.joinRoom(r);
 						roomDict[r] = room;
 					} catch (e) {
-						if(e.errcode === 'M_UNKNOWN') continue;
-						else throw e;
+						if(e instanceof MatrixError){
+							if(e.errcode === 'M_UNKNOWN') continue;
+							else throw e;
+						}
 					}
 				}
 				if(roomDict[r] && roomDict[r].name === dir[i]){ //Room is found
@@ -195,6 +197,7 @@ export default class Client{
 			return;
 		}
 		try{
+			if(message.length === 0) message = '<Empty>';
 			await this.client.sendMessage(roomId, {
 				body: message,
 				msgtype: 'm.text',
