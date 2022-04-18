@@ -6,13 +6,13 @@ export default class AddTrustedHandler extends CommandHandler{
 		if(command[0] !== this.prefix) return;
 		let users = [];
 		for(let i = 1; i < command.length; i++){
-			let user = command[i];
+			let user = command[i].trim();
 			if(!user.startsWith('@')) user = '@' + user;
 			if(!user.includes(':')) user += (':' + this.client.config.serverName);
 			users.push(user);
 		}
-		const newList = this.client.trusted.trusted.concat(users);
-		await this.client.changeTrustedList(newList);
+		const newList = new Set(this.client.trusted.trusted.concat(users));
+		await this.client.changeTrustedList(Array.from(newList));
 		this.client.sendMessage(event.getRoomId()!, `The following users have been added to the trusted list:\n${users.join(', ')}`);
 	}
 }
