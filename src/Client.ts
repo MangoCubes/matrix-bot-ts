@@ -10,6 +10,10 @@ import EchoHandler from './commands/EchoHandler';
 import InviteHandler from './commands/InviteHandler';
 import PurgeHandler from './commands/PurgeHandler';
 
+type RoomCreationOptions = {
+	showHistory: boolean;
+}
+
 type RoomSecurity = {res: 0 | 1 | 2} | {res: 3, unverified: string[], verified: string[]};
 
 export default class Client{
@@ -72,7 +76,7 @@ export default class Client{
 		});
 	}
 
-	async findRoomByDir(dir: string[], createIfNotExists: boolean){
+	async findRoomByDir(dir: string[], createIfNotExists: null | RoomCreationOptions): Promise<{isNew: boolean, roomId: string} | null>{
 		const rooms = this.client.getRooms();
 		let roomDict: {[roomId: string]: sdk.Room} = {};
 		let currentRooms = await this.getRootSpaces();
@@ -94,7 +98,10 @@ export default class Client{
 					}
 				}
 				if(roomDict[r] && roomDict[r].name === dir[i]){ //Room is found
-					if (isLast) return r;
+					if (isLast) return {
+						isNew: false,
+						roomId: r
+					};
 					const children = await this.findRoomsInSpace(r);
 					if (!children) return null;
 					currentRooms = children;
@@ -105,8 +112,11 @@ export default class Client{
 			}
 			if (!found) {
 				if(createIfNotExists) { //Room with given name is not found
-					const newRoom: string = await this.createSubRoom(dir[i], parent, false, true, !isLast);
-					if (isLast) return newRoom;
+					const newRoom: string = await this.createSubRoom(dir[i], parent, false, true, !isLast, createIfNotExists.showHistory);
+					if (isLast) return {
+						isNew: true,
+						roomId: newRoom
+					};
 					roomDict[newRoom] = await this.client.joinRoom(newRoom);
 					currentRooms = [];
 					parent = newRoom;
@@ -156,7 +166,7 @@ export default class Client{
 	 * @param name Name of the room 
 	 * @returns Room ID, whether it's created or found
 	 */
-	async findRoomInSpace(space: string, name: string, createIfNotExists: boolean){
+	async findRoomInSpace(space: string, name: string, createIfNotExists: null | RoomCreationOptions){
 		const room = this.client.getRoom(space);
 		if(!room) return null;
 		const roomStates = await this.client.roomState(room.roomId);
@@ -167,7 +177,7 @@ export default class Client{
 				if(child.name === name) return child.roomId;
 			}
 		}
-		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, true, false) : null;
+		return createIfNotExists ? await this.createSubRoom(name, room.roomId, false, true, false, createIfNotExists.showHistory) : null;
 	}
 
 	async isUserVerified(userId: string): Promise<boolean>{
@@ -208,9 +218,9 @@ export default class Client{
 	}
 
 	async invite(userId: string){
-		const mainRoom = await this.findRoomByDir([this.userId], true);
+		const mainRoom = await this.findRoomByDir([this.userId], {showHistory: false});
 		if(!mainRoom) return;
-		await this.client.invite(mainRoom, userId);
+		await this.client.invite(mainRoom.roomId, userId);
 	}
 
 	async createSpace(name: string){
@@ -223,7 +233,7 @@ export default class Client{
 		})).room_id;
 	}
 
-	async createSubRoom(name: string, parent: string | null, suggest: boolean, autoJoin: boolean, isSpace: boolean){
+	async createSubRoom(name: string, parent: string | null, suggest: boolean, autoJoin: boolean, isSpace: boolean, showAll: boolean){
 		if(!parent) return await this.createSpace(name);
 		let options: sdk.ICreateRoomOpts = {
 			visibility: Visibility.Public,
@@ -256,6 +266,14 @@ export default class Client{
 		if(isSpace) options.creation_content = {
 			[RoomCreateTypeField]: RoomType.Space
 		}
+		if(showAll) options.initial_state!.push(
+			{
+				type: EventType.RoomHistoryVisibility,
+				content: {
+					history_visibility: 'shared'
+				}
+			}
+		)
 		const roomId = await this.client.createRoom(options);
 		await this.client.sendStateEvent(parent, EventType.SpaceChild, {
 			suggested: suggest,
