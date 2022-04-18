@@ -3,6 +3,7 @@ import sdk, { ClientEvent, EventType, JoinRule, MatrixEvent, MemoryCryptoStore, 
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
+import MessageError from './class/error/MessageError';
 import CommandHandler from './commands/CommandHandler';
 import DebugHandler from './commands/DebugHandler';
 import EchoHandler from './commands/EchoHandler';
@@ -193,10 +194,14 @@ export default class Client{
 			console.log(security);
 			return;
 		}
-		await this.client.sendMessage(roomId, {
-			body: message,
-			msgtype: 'm.text',
-		});
+		try{
+			await this.client.sendMessage(roomId, {
+				body: message,
+				msgtype: 'm.text',
+			});
+		} catch (e) {
+			throw new MessageError(roomId, false);
+		}
 	}
 
 	async invite(userId: string){
@@ -290,10 +295,14 @@ export default class Client{
 			console.log(security);
 			return;
 		}
-		await this.client.sendMessage(room, {
-			body: message,
-			msgtype: 'm.text',
-		});
+		try{
+			await this.client.sendMessage(room, {
+				body: message,
+				msgtype: 'm.text',
+			});
+		} catch (e) {
+			throw new MessageError(room, true);
+		}
 	}
 
 	async membershipHandler (e: sdk.MatrixEvent, m: sdk.RoomMember, o: string | null) {
