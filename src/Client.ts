@@ -11,7 +11,7 @@ import InviteHandler from './commands/InviteHandler';
 import PurgeHandler from './commands/PurgeHandler';
 import { ConfigFile, TrustedFile } from './generateConfig';
 import { promises as fs } from 'fs';
-import AddTrustedHandler from './commands/AddTrustedHandler';
+import TrustedHandler from './commands/TrustedHandler';
 
 
 type RoomCreationOptions = {
@@ -59,7 +59,7 @@ export default class Client{
 			verificationMethods: ['m.sas.v1'],
 		});
 		this.dmRooms = {};
-		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge'), new AddTrustedHandler(this, '!trust')];
+		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge'), new TrustedHandler(this, '!trust')];
 	}
 
 	async init(){
