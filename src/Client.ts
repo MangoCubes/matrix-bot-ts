@@ -297,6 +297,7 @@ export default class Client{
 			const members = await r.getEncryptionTargetMembers();
 			if(members.length !== 2) continue;
 			const other = members[0].userId === this.config.userId ? members[1] : members[0];
+			if(this.dmRooms[other.userId]) await this.client.leave(this.dmRooms[other.userId]);
 			if(other.getDMInviter() === this.config.userId) this.dmRooms[other.userId] = r.roomId;
 			else {
 				const inviter = r.getDMInviter();
