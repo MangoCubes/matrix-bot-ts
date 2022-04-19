@@ -292,13 +292,15 @@ export default class Client{
 	}
 
 	async refreshDMRooms(){
-		const accountData = this.client.getAccountData('m.direct');
-		if(!accountData) return;
-		const dmMap = accountData.getContent();
-		for(const u in dmMap){
-			for(const r of dmMap[u]){
-				const room = this.client.getRoom(r);
-				if (room) this.dmRooms[u] = r;
+		const rooms = this.client.getRooms();
+		for(const r of rooms){
+			const members = await r.getEncryptionTargetMembers();
+			if(members.length !== 2) continue;
+			const other = members[0].userId === this.config.userId ? members[1] : members[0];
+			if(other.getDMInviter() === this.config.userId) this.dmRooms[other.userId] = r.roomId;
+			else {
+				const inviter = r.getDMInviter();
+				if(inviter) this.dmRooms[inviter] = r.roomId;
 			}
 		}
 	}
