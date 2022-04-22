@@ -2,6 +2,7 @@ import Client from "../Client";
 import CommandHandler from "./CommandHandler";
 import yargs from 'yargs/yargs';
 import fs from 'fs';
+import path from "path";
 
 interface Alias{
 	pattern: readonly string[];
@@ -29,6 +30,7 @@ export default class InviteHandler extends CommandHandler{
 		if(fs.existsSync(this.fileLocation)) this.aliases = JSON.parse(fs.readFileSync(this.fileLocation, 'utf8'));
 		else {
 			this.aliases = {};
+			fs.mkdirSync(path.dirname(this.fileLocation), {recursive: true});
 			fs.writeFileSync(this.fileLocation, '{}');
 		}
 		this.tempAliases = {};
@@ -42,22 +44,24 @@ export default class InviteHandler extends CommandHandler{
 	}
 
 	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
-		if(this.steps[roomId][sender] === 1){
-			this.tempAliases[roomId][sender] = command;
-			await this.client.sendMessage(roomId, 'Please type the command you want this alias to replace.');
-			this.steps[roomId][sender] = 2;
-			return;
-		} else if(this.steps[roomId][sender] === 2){
-			const alias = this.tempAliases[roomId][sender];
-			this.aliases[roomId].push({
-				pattern: alias,
-				aliasOf: command
-			});
-			await this.writeFile();
-			await this.client.sendMessage(roomId, 'Alias set.');
-			delete this.steps[roomId][sender];
-			await this.client.unlockCommands(sender, roomId);
-			return;
+		if(this.steps[roomId]){
+			if(this.steps[roomId][sender] === 1){
+				this.tempAliases[roomId][sender] = command;
+				await this.client.sendMessage(roomId, 'Please type the command you want this alias to replace.');
+				this.steps[roomId][sender] = 2;
+				return;
+			} else if(this.steps[roomId][sender] === 2){
+				const alias = this.tempAliases[roomId][sender];
+				this.aliases[roomId].push({
+					pattern: alias,
+					aliasOf: command
+				});
+				await this.writeFile();
+				await this.client.sendMessage(roomId, 'Alias set.');
+				delete this.steps[roomId][sender];
+				await this.client.unlockCommands(sender, roomId);
+				return;
+			}
 		}
 		if(command[0] !== this.prefix) {
 			for(const a of this.aliases[roomId]){
@@ -74,7 +78,7 @@ export default class InviteHandler extends CommandHandler{
 		const args = yargs(command.slice(1)).string(['_']).version(false).help(false).exitProcess(false).showHelpOnFail(false).positional('mode', {
 			choices: ['a', 'add', 'r', 'remove']
 		}).parseSync();
-		if(!this.steps[roomId][sender]){
+		if(!this.steps[roomId] || !this.steps[roomId][sender]){
 			if(args.mode === 'a' || args.mode === 'add'){
 				await this.client.sendMessage(roomId, 'Please type the command you want to create.');
 				await this.client.lockCommands(sender, roomId);

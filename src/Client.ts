@@ -13,6 +13,7 @@ import { ConfigFile, TrustedFile } from './generateConfig';
 import { promises as fs } from 'fs';
 import TrustedHandler from './commands/TrustedHandler';
 import LockHandler from './commands/LockHandler';
+import AliasHandler from './commands/AliasHandler';
 
 
 type RoomCreationOptions = {
@@ -69,7 +70,8 @@ export default class Client{
 			new EchoHandler(this, '!echo'),
 			new InviteHandler(this, '!invite'),
 			new PurgeHandler(this, '!purge'),
-			new TrustedHandler(this, '!trust')
+			new TrustedHandler(this, '!trust'),
+			new AliasHandler(this, '!alias', './config/commands/alias.json')
 		];
 		this.handlersDuringLocked = [
 			new LockHandler(this, '!lock')
