@@ -29,6 +29,9 @@ export default class Client{
 	handlers: CommandHandler[];
 	configDir: string;
 	trustedDir: string;
+	locked: {[roomId: string]: {
+		[userId: string]: boolean;
+	}}
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		this.configDir = configDir;
 		this.trustedDir = trustedDir;
@@ -60,6 +63,7 @@ export default class Client{
 		});
 		this.dmRooms = {};
 		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge'), new TrustedHandler(this, '!trust')];
+		this.locked = {};
 	}
 
 	async init(){
@@ -365,8 +369,17 @@ export default class Client{
 			}
 		}
 	}
+	
+	async lockCommands(userId: string, roomId: string){
+		this.locked[roomId][userId] = true;
+	}
+
+	async unlockCommands(userId: string, roomId: string){
+		this.locked[roomId][userId] = false;
+	}
 
 	async handleCommand(message: string, sender: string, roomId: string){
+		if(this.locked[roomId][sender]) return;
 		const cmd = message.split(' ');
 		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
