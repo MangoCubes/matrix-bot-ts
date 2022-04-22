@@ -354,8 +354,9 @@ export default class Client{
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
-			const cmd = (e.clearEvent.content.body as string).split(' ');
-			for(const h of this.handlers) h.onMessage(cmd, data, e.clearEvent);
+			const roomId = data.getRoomId();
+			if(!roomId) return;
+			this.handleCommand(e.clearEvent.content.body as string, data.getSender(), roomId);
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
 			else {
@@ -363,6 +364,11 @@ export default class Client{
 				console.log(err)
 			}
 		}
+	}
+
+	async handleCommand(message: string, sender: string, roomId: string){
+		const cmd = message.split(' ');
+		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
 
 	async changeTrustedList(newList: string[]): Promise<void>{

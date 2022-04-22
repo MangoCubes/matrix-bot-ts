@@ -3,7 +3,7 @@ import yargs from 'yargs/yargs';
 import CommandHandler from "./CommandHandler";
 
 export default class TrustedHandler extends CommandHandler{
-	async handleMessage(command: readonly string[], event: MatrixEvent, clear: IClearEvent): Promise<void> {
+	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
 		if(command[0] !== this.prefix) return;
 		const args = yargs(command.slice(1)).string(['_']).version(false).help(false).exitProcess(false).showHelpOnFail(false).options({
 			overwrite: {type: 'boolean', alias: 'o'},
@@ -24,7 +24,7 @@ export default class TrustedHandler extends CommandHandler{
 			newUserList = Array.from(tempSet);
 		}
 		await this.changeUsers(newUserList);
-		await this.client.sendMessage(event.getRoomId()!, `The following users have been added to the trusted list:\n${this.client.trusted.trusted.join(', ')}`);
+		await this.client.sendMessage(roomId, `The following users have been added to the trusted list:\n${this.client.trusted.trusted.join(', ')}`);
 	}
 
 	normaliseNames(usernames: string[]){

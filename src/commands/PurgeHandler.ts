@@ -8,22 +8,21 @@ export default class InviteHandler extends CommandHandler{
 		super(client, prefix);
 		this.inProgress = {};
 	}
-	async handleMessage(command: readonly string[], event: MatrixEvent, clear: IClearEvent): Promise<void> {
-		if(!clear.room_id) return;
-		if(command[0] === 'yes' && this.inProgress[clear.room_id] === event.getSender()){
-			await this.client.sendMessage(clear.room_id, 'Confirmed.');
-			delete this.inProgress[clear.room_id];
-			await this.client.deleteRoom(clear.room_id);
+	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
+		if(command[0] === 'yes' && this.inProgress[roomId] === sender){
+			await this.client.sendMessage(roomId, 'Confirmed.');
+			delete this.inProgress[roomId];
+			await this.client.deleteRoom(roomId);
 		} else {
 			let cancelled = false;
-			if(this.inProgress[clear.room_id]) {
-				delete this.inProgress[clear.room_id];
+			if(this.inProgress[roomId]) {
+				delete this.inProgress[roomId];
 				cancelled = true;
 			}
 			if (command[0] === this.prefix){
-				this.inProgress[clear.room_id] = event.getSender();
-				await this.client.sendMessage(clear.room_id, 'Are you sure you want to purge this room? Please type \'yes\' to confirm.');
-			} else if (cancelled) await this.client.sendMessage(clear.room_id, 'Purge cancelled.');
+				this.inProgress[roomId] = sender;
+				await this.client.sendMessage(roomId, 'Are you sure you want to purge this room? Please type \'yes\' to confirm.');
+			} else if (cancelled) await this.client.sendMessage(roomId, 'Purge cancelled.');
 		}
 	}
 }
