@@ -12,6 +12,7 @@ import PurgeHandler from './commands/PurgeHandler';
 import { ConfigFile, TrustedFile } from './generateConfig';
 import { promises as fs } from 'fs';
 import TrustedHandler from './commands/TrustedHandler';
+import LockHandler from './commands/LockHandler';
 
 
 type RoomCreationOptions = {
@@ -32,6 +33,7 @@ export default class Client{
 	locked: {[roomId: string]: {
 		[userId: string]: boolean;
 	}}
+	handlersDuringLocked: CommandHandler[];
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		this.configDir = configDir;
 		this.trustedDir = trustedDir;
@@ -62,7 +64,16 @@ export default class Client{
 			verificationMethods: ['m.sas.v1'],
 		});
 		this.dmRooms = {};
-		this.handlers = [new DebugHandler(this, '!debug'), new EchoHandler(this, '!echo'), new InviteHandler(this, '!invite'), new PurgeHandler(this, '!purge'), new TrustedHandler(this, '!trust')];
+		this.handlers = [
+			new DebugHandler(this, '!debug'),
+			new EchoHandler(this, '!echo'),
+			new InviteHandler(this, '!invite'),
+			new PurgeHandler(this, '!purge'),
+			new TrustedHandler(this, '!trust')
+		];
+		this.handlersDuringLocked = [
+			new LockHandler(this, '!lock')
+		]
 		this.locked = {};
 	}
 
@@ -379,8 +390,9 @@ export default class Client{
 	}
 
 	async handleCommand(message: string, sender: string, roomId: string){
-		if(this.locked[roomId][sender]) return;
 		const cmd = message.split(' ');
+		for(const h of this.handlersDuringLocked) h.onMessage(cmd, sender, roomId);
+		if(this.locked[roomId][sender]) return;
 		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
 
