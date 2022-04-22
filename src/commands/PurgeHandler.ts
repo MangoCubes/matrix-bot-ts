@@ -1,4 +1,3 @@
-import { MatrixEvent, IClearEvent } from "matrix-js-sdk";
 import Client from "../Client";
 import CommandHandler from "./CommandHandler";
 

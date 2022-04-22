@@ -1,17 +1,18 @@
-import { MatrixEvent, IClearEvent } from "matrix-js-sdk";
-import yargs from 'yargs/yargs';
+import minimist from 'minimist';
 import CommandHandler from "./CommandHandler";
 
 export default class TrustedHandler extends CommandHandler{
 	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
 		if(command[0] !== this.prefix) return;
-		const args = yargs(command.slice(1)).string(['_']).version(false).help(false).exitProcess(false).showHelpOnFail(false).options({
-			overwrite: {type: 'boolean', alias: 'o'},
-			add: {type: 'boolean', alias: 'a'},
-			remove: {type: 'boolean', alias: 'r'}
-		}).parseSync();
-		const users = args._.map((v) => typeof(v) === 'string' ? v : v.toString());
-		const input = this.normaliseNames(users);
+		const args = minimist(command.slice(1), {
+			boolean: ['overwrite', 'add', 'remove'],
+			alias: {
+				'overwrite': 'o',
+				'add': 'a',
+				'remove': 'r'
+			}
+		});
+		const input = this.normaliseNames(args._);
 		let newUserList = [];
 		if(args.overwrite) newUserList = [...input];
 		else if(args.remove) {

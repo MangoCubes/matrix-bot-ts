@@ -1,4 +1,3 @@
-import { MatrixEvent, IClearEvent } from "matrix-js-sdk";
 import CommandHandler from "./CommandHandler";
 
 export default class EchoHandler extends CommandHandler{

@@ -1,6 +1,6 @@
 import Client from "../Client";
 import CommandHandler from "./CommandHandler";
-import yargs from 'yargs/yargs';
+import minimist from 'minimist';
 import fs from 'fs';
 import path from "path";
 
@@ -64,6 +64,7 @@ export default class InviteHandler extends CommandHandler{
 			}
 		}
 		if(command[0] !== this.prefix) {
+			if(!this.aliases[roomId]) return;
 			for(const a of this.aliases[roomId]){
 				const res = this.parse(a.pattern, command);
 				if(res === null) continue;
@@ -75,11 +76,9 @@ export default class InviteHandler extends CommandHandler{
 			}
 			return;
 		}
-		const args = yargs(command.slice(1)).string(['_']).version(false).help(false).exitProcess(false).showHelpOnFail(false).positional('mode', {
-			choices: ['a', 'add', 'r', 'remove']
-		}).parseSync();
+		const args = minimist(command.slice(1));
 		if(!this.steps[roomId] || !this.steps[roomId][sender]){
-			if(args.mode === 'a' || args.mode === 'add'){
+			if(args._[0] === 'a' || args._[0] === 'add'){
 				await this.client.sendMessage(roomId, 'Please type the command you want to create.');
 				await this.client.lockCommands(sender, roomId);
 				this.steps[roomId][sender] = 1;

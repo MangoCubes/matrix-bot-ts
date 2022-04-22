@@ -1,4 +1,3 @@
-import { IClearEvent, MatrixEvent } from "matrix-js-sdk";
 import MessageError from "../class/error/MessageError";
 import Client from "../Client";
 
