@@ -95,8 +95,8 @@ export default class Client{
 		this.client.on(ClientEvent.Sync, async (state, lastState, data) => {
 			if(state === 'PREPARED'){
 				await this.client.uploadKeys();
-				await this.refreshDMRooms();
 				await this.leaveEmptyRooms();
+				await this.refreshDMRooms();
 				console.log(this.dmRooms)
 				console.log('Client started.');
 			}
@@ -395,10 +395,12 @@ export default class Client{
 	}
 	
 	async lockCommands(userId: string, roomId: string){
+		if(!this.locked[roomId]) this.locked[roomId] = {}
 		this.locked[roomId][userId] = true;
 	}
 
 	async unlockCommands(userId: string, roomId: string){
+		if(!this.locked[roomId]) this.locked[roomId] = {}
 		this.locked[roomId][userId] = false;
 	}
 
