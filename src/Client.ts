@@ -96,9 +96,19 @@ export default class Client{
 			if(state === 'PREPARED'){
 				await this.client.uploadKeys();
 				await this.refreshDMRooms();
+				await this.leaveEmptyRooms();
+				console.log(this.dmRooms)
 				console.log('Client started.');
 			}
 		});
+	}
+
+	async leaveEmptyRooms(){
+		const rooms = this.client.getRooms();
+		for(const r of rooms){
+			const invited = r.getInvitedAndJoinedMemberCount();
+			if (invited === 1) await this.client.leave(r.roomId);
+		}
 	}
 
 	async findRoomByDir(dir: string[], createIfNotExists: null | RoomCreationOptions): Promise<{isNew: boolean, roomId: string} | null>{
@@ -228,7 +238,6 @@ export default class Client{
 	async sendMessage(roomId: string, message: string){
 		const security = await this.isRoomSafe(roomId);
 		if (security.res) {
-			console.log(security);
 			return;
 		}
 		try{
@@ -238,6 +247,7 @@ export default class Client{
 				msgtype: 'm.text',
 			});
 		} catch (e) {
+			console.log(e)
 			throw new MessageError(roomId, false);
 		}
 	}
@@ -311,7 +321,7 @@ export default class Client{
 	async refreshDMRooms(){
 		const rooms = this.client.getRooms();
 		for(const r of rooms){
-			const members = await r.getEncryptionTargetMembers();
+			const members = r.getMembers();
 			if(members.length !== 2) continue;
 			const other = members[0].userId === this.config.userId ? members[1] : members[0];
 			if(this.dmRooms[other.userId]) await this.client.leave(this.dmRooms[other.userId]);
@@ -350,6 +360,7 @@ export default class Client{
 				msgtype: 'm.text',
 			});
 		} catch (e) {
+			console.log(e)
 			throw new MessageError(room, true);
 		}
 	}
@@ -394,6 +405,7 @@ export default class Client{
 	async handleCommand(message: string, sender: string, roomId: string){
 		const cmd = message.split(' ');
 		for(const h of this.handlersDuringLocked) h.onMessage(cmd, sender, roomId);
+		if(!this.locked[roomId]) this.locked[roomId] = {};
 		if(this.locked[roomId][sender]) return;
 		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
