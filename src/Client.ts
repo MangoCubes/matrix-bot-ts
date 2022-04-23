@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import sdk, { ClientEvent, EventTimeline, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
@@ -26,7 +26,7 @@ export default class Client{
 	client: sdk.MatrixClient;
 	config: ConfigFile;
 	debugMode: boolean;
-	dmRooms: {[rid: string]: string};
+	dmRooms: {[uid: string]: string};
 	trusted: TrustedFile;
 	handlers: CommandHandler[];
 	configDir: string;
@@ -94,7 +94,6 @@ export default class Client{
 				await this.client.uploadKeys();
 				await this.leaveEmptyRooms();
 				await this.refreshDMRooms();
-				console.log(this.dmRooms)
 				console.log('Client started.');
 			}
 		});
@@ -316,17 +315,11 @@ export default class Client{
 	}
 
 	async refreshDMRooms(){
-		const rooms = this.client.getRooms();
-		for(const r of rooms){
-			const members = r.getMembers();
-			if(members.length !== 2) continue;
-			const other = members[0].userId === this.config.userId ? members[1] : members[0];
-			if(this.dmRooms[other.userId]) await this.client.leave(this.dmRooms[other.userId]);
-			if(other.getDMInviter() === this.config.userId) this.dmRooms[other.userId] = r.roomId;
-			else {
-				const inviter = r.getDMInviter();
-				if(inviter) this.dmRooms[inviter] = r.roomId;
-			}
+		const dmData = this.client.getAccountData(EventType.Direct);
+		if(!dmData) return;
+		const content: {[uid: string]: string[]} = dmData.getContent();
+		for(const u in content){
+			if (content[u].length) this.dmRooms[u] = content[u][0];
 		}
 	}
 
@@ -342,9 +335,16 @@ export default class Client{
 		if(userId === this.config.userId) return;
 		let room = this.dmRooms[userId];
 		if(!room){
-			const roomId = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
-			this.dmRooms[userId] = roomId.room_id;
-			room = roomId.room_id;
+			// As per https://spec.matrix.org/latest/client-server-api/#client-behaviour-21, I must set m.direct myself.
+			const createRoom = await this.client.createRoom({preset: Preset.TrustedPrivateChat, invite: [userId], is_direct: true});
+			room = createRoom.room_id;
+			const accountData = this.client.getAccountData(EventType.Direct);
+			let dmRooms: {[userId: string]: string[]} = {};
+			if(accountData) dmRooms = accountData.getContent();
+			if(!dmRooms[userId]) dmRooms[userId] = [room];
+			else dmRooms[userId].push(room);
+			await this.client.setAccountData(EventType.Direct, dmRooms);
+			this.dmRooms[userId] = room;
 		}
 		const security = await this.isRoomSafe(room);
 		if (security.res) {
@@ -366,7 +366,15 @@ export default class Client{
 		try{
 			if (m.membership === 'invite' && m.userId === this.config.userId) {
 				await this.client.joinRoom(m.roomId);
-				await this.refreshDMRooms();
+				if(e.getContent().is_direct){
+					const accountData = this.client.getAccountData(EventType.Direct);
+					let dmRooms: {[userId: string]: string[]} = {};
+					if(accountData) dmRooms = accountData.getContent();
+					if(!dmRooms[e.getSender()]) dmRooms[e.getSender()] = [m.roomId];
+					else dmRooms[e.getSender()].push(m.roomId);
+					await this.client.setAccountData(EventType.Direct, dmRooms);
+					this.dmRooms[e.getSender()] = m.roomId;
+				}
 			}
 		} catch(e) {
 			console.log(e);
