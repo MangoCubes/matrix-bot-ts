@@ -10,9 +10,17 @@ export default class EchoHandler extends CommandHandler{
 				'lock': ['l']
 			}
 		});
-		console.log(args)
-		if(args.lock) await this.client.lockCommands(sender, roomId);
-		else await this.client.unlockCommands(sender, roomId);
-		await this.client.sendMessage(roomId, `You have been ${args.lock ? '' : 'un'}locked.`);
+		if(args.lock) {
+			if(await this.client.isLocked(sender, roomId)) await this.client.sendMessage(roomId, `You are already locked.`);
+			else {
+				await this.client.lockCommands(sender, roomId);
+				await this.client.sendMessage(roomId, `You have been locked.`);
+			}
+		} else {
+			if(await this.client.isLocked(sender, roomId)) {
+				await this.client.unlockCommands(sender, roomId);
+				await this.client.sendMessage(roomId, `You have been unlocked.`);
+			} else await this.client.sendMessage(roomId, `You are already unlocked.`);	
+		}
 	}
 }

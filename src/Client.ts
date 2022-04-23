@@ -395,20 +395,26 @@ export default class Client{
 	}
 	
 	async lockCommands(userId: string, roomId: string){
-		if(!this.locked[roomId]) this.locked[roomId] = {}
+		if(!this.locked[roomId]) this.locked[roomId] = {};
 		this.locked[roomId][userId] = true;
 	}
 
 	async unlockCommands(userId: string, roomId: string){
-		if(!this.locked[roomId]) this.locked[roomId] = {}
+		if(!this.locked[roomId]) this.locked[roomId] = {};
 		this.locked[roomId][userId] = false;
+	}
+
+	async isLocked(userId: string, roomId: string){
+		if(!this.locked[roomId]) {
+			this.locked[roomId] = {};
+			return false;
+		} else return this.locked[roomId][userId] ? true : false;
 	}
 
 	async handleCommand(message: string, sender: string, roomId: string){
 		const cmd = message.split(' ');
 		for(const h of this.handlersDuringLocked) h.onMessage(cmd, sender, roomId);
-		if(!this.locked[roomId]) this.locked[roomId] = {};
-		if(this.locked[roomId][sender]) return;
+		if (await this.isLocked(sender, roomId)) return;
 		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
 
