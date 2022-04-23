@@ -2,16 +2,29 @@ import MessageError from "../class/error/MessageError";
 import Client from "../Client";
 import crypto from 'crypto';
 
+interface Config{
+	ignoreLock?: boolean;
+}
+
 export default abstract class CommandHandler{
 	readonly prefix: string;
 	readonly client: Client;
 	readonly cid: string;
-	constructor(client: Client, prefix: string){
+	readonly options: Config;
+	constructor(client: Client, prefix: string, options?: Config){
 		this.prefix = prefix;
 		this.client = client;
 		this.cid = crypto.randomUUID();
+		this.options = options ? options : {};
 	}
 	async onMessage(command: string[], sender: string, roomId: string): Promise<void>{
+		if(!this.options.ignoreLock){
+			if(!this.client.lock[roomId]){
+				this.client.lock[roomId] = {};
+				return;
+			}
+			if(this.client.lock[roomId][sender] && this.cid !== this.client.lock[roomId][sender]) return;
+		}
 		try{
 			await this.handleMessage(command, sender, roomId); //Try sending message back
 		} catch (e) {

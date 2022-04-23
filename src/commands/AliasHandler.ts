@@ -77,10 +77,11 @@ export default class InviteHandler extends CommandHandler{
 			return;
 		}
 		const args = minimist(command.slice(1));
-		if(!this.steps[roomId] || !this.steps[roomId][sender]){
+		this.steps[roomId] = {};
+		if(!this.steps[roomId][sender]){
 			if(args._[0] === 'a' || args._[0] === 'add'){
 				await this.client.sendMessage(roomId, 'Please type the command you want to create.');
-				await this.client.lockCommands(sender, roomId);
+				await this.client.lockCommands(sender, roomId, this.cid);
 				this.steps[roomId][sender] = 1;
 			}
 		}

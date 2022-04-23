@@ -381,7 +381,7 @@ export default class Client{
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const roomId = data.getRoomId();
 			if(!roomId) return;
-			this.handleCommand(e.clearEvent.content.body as string, data.getSender(), roomId);
+			await this.handleCommand(e.clearEvent.content.body as string, data.getSender(), roomId);
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
 			else {
@@ -398,7 +398,7 @@ export default class Client{
 
 	async unlockCommands(userId: string, roomId: string){
 		if(!this.lock[roomId]) this.lock[roomId] = {};
-		delete this.lock[roomId];
+		delete this.lock[roomId][userId];
 	}
 
 	async getLock(userId: string, roomId: string){
@@ -410,12 +410,7 @@ export default class Client{
 
 	async handleCommand(message: string, sender: string, roomId: string){
 		const cmd = message.split(' ');
-		const lock = await this.getLock(sender, roomId);
-		if (lock) {
-			const targetCommand = this.handlers.find((v) => v.cid === lock);
-			if(!targetCommand) await this.unlockCommands(sender, roomId);
-			else targetCommand.onMessage(cmd, sender, roomId);
-		} else for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
+		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
 
 	async changeTrustedList(newList: string[]): Promise<void>{
