@@ -46,16 +46,19 @@ export default class InviteHandler extends CommandHandler{
 	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
 		if(this.steps[roomId]){
 			if(this.steps[roomId][sender] === 1){
+				if(!this.tempAliases[roomId]) this.tempAliases[roomId] = {}
 				this.tempAliases[roomId][sender] = command;
 				await this.client.sendMessage(roomId, 'Please type the command you want this alias to replace.');
 				this.steps[roomId][sender] = 2;
 				return;
 			} else if(this.steps[roomId][sender] === 2){
 				const alias = this.tempAliases[roomId][sender];
-				this.aliases[roomId].push({
+				const aliasData = {
 					pattern: alias,
 					aliasOf: command
-				});
+				}
+				if(!this.aliases[roomId]) this.aliases[roomId] = [aliasData];
+				else this.aliases[roomId].push(aliasData);
 				await this.writeFile();
 				await this.client.sendMessage(roomId, 'Alias set.');
 				delete this.steps[roomId][sender];
