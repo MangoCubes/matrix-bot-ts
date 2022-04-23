@@ -1,12 +1,15 @@
 import MessageError from "../class/error/MessageError";
 import Client from "../Client";
+import crypto from 'crypto';
 
 export default abstract class CommandHandler{
 	readonly prefix: string;
 	readonly client: Client;
+	readonly cid: string;
 	constructor(client: Client, prefix: string){
 		this.prefix = prefix;
 		this.client = client;
+		this.cid = crypto.randomUUID();
 	}
 	async onMessage(command: string[], sender: string, roomId: string): Promise<void>{
 		try{

@@ -31,10 +31,9 @@ export default class Client{
 	handlers: CommandHandler[];
 	configDir: string;
 	trustedDir: string;
-	locked: {[roomId: string]: {
-		[userId: string]: boolean;
+	lock: {[roomId: string]: {
+		[userId: string]: string;
 	}}
-	handlersDuringLocked: CommandHandler[];
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		this.configDir = configDir;
 		this.trustedDir = trustedDir;
@@ -71,12 +70,10 @@ export default class Client{
 			new InviteHandler(this, '!invite'),
 			new PurgeHandler(this, '!purge'),
 			new TrustedHandler(this, '!trust'),
-			new AliasHandler(this, '!alias', './config/commands/alias.json')
-		];
-		this.handlersDuringLocked = [
+			new AliasHandler(this, '!alias', './config/commands/alias.json'),
 			new LockHandler(this, '!lock')
-		]
-		this.locked = {};
+		];
+		this.lock = {};
 	}
 
 	async init(){
@@ -394,28 +391,31 @@ export default class Client{
 		}
 	}
 	
-	async lockCommands(userId: string, roomId: string){
-		if(!this.locked[roomId]) this.locked[roomId] = {};
-		this.locked[roomId][userId] = true;
+	async lockCommands(userId: string, roomId: string, to: string){
+		if(!this.lock[roomId]) this.lock[roomId] = {};
+		this.lock[roomId][userId] = to;
 	}
 
 	async unlockCommands(userId: string, roomId: string){
-		if(!this.locked[roomId]) this.locked[roomId] = {};
-		this.locked[roomId][userId] = false;
+		if(!this.lock[roomId]) this.lock[roomId] = {};
+		delete this.lock[roomId];
 	}
 
-	async isLocked(userId: string, roomId: string){
-		if(!this.locked[roomId]) {
-			this.locked[roomId] = {};
+	async getLock(userId: string, roomId: string){
+		if(!this.lock[roomId]) {
+			this.lock[roomId] = {};
 			return false;
-		} else return this.locked[roomId][userId] ? true : false;
+		} else return this.lock[roomId][userId] ? this.lock[roomId][userId] : null;
 	}
 
 	async handleCommand(message: string, sender: string, roomId: string){
 		const cmd = message.split(' ');
-		for(const h of this.handlersDuringLocked) h.onMessage(cmd, sender, roomId);
-		if (await this.isLocked(sender, roomId)) return;
-		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
+		const lock = await this.getLock(sender, roomId);
+		if (lock) {
+			const targetCommand = this.handlers.find((v) => v.cid === lock);
+			if(!targetCommand) await this.unlockCommands(sender, roomId);
+			else targetCommand.onMessage(cmd, sender, roomId);
+		} else for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
 	}
 
 	async changeTrustedList(newList: string[]): Promise<void>{
