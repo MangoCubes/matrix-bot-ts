@@ -1,8 +1,9 @@
 import Client from "../Client";
+//import { Command, Option } from "commander";
 import CommandHandler from "./CommandHandler";
-import minimist from 'minimist';
 import fs from 'fs';
 import path from "path";
+import yargs from "yargs/yargs";
 
 interface Alias{
 	pattern: readonly string[];
@@ -14,16 +15,6 @@ export default class InviteHandler extends CommandHandler{
 		[roomId: string]: Alias[]
 	};
 	fileLocation: string;
-	steps: {
-		[roomId: string]: {
-			[user: string]: number;
-		}
-	}
-	tempAliases: {
-		[roomId: string]: {
-			[userId: string]: readonly string[];
-		}
-	};
 	constructor(client: Client, prefix: string, fileLocation: string){
 		super(client, prefix);
 		this.fileLocation = fileLocation;
@@ -33,8 +24,6 @@ export default class InviteHandler extends CommandHandler{
 			fs.mkdirSync(path.dirname(this.fileLocation), {recursive: true});
 			fs.writeFileSync(this.fileLocation, '{}');
 		}
-		this.tempAliases = {};
-		this.steps = {};
 	}
 
 	async writeFile(){
@@ -44,33 +33,6 @@ export default class InviteHandler extends CommandHandler{
 	}
 
 	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
-		if(this.steps[roomId]){
-			if(this.steps[roomId][sender] === 1){
-				if(command.length && command[0] === this.prefix){
-					delete this.steps[roomId][sender];
-					await this.client.unlockCommands(sender, roomId);
-					await this.client.sendMessage(roomId, 'Do not set alias command as alias as this may cause infinite loops. Exiting.');
-				}
-				if(!this.tempAliases[roomId]) this.tempAliases[roomId] = {}
-				this.tempAliases[roomId][sender] = command;
-				await this.client.sendMessage(roomId, 'Please type the command you want this alias to replace.');
-				this.steps[roomId][sender] = 2;
-				return;
-			} else if(this.steps[roomId][sender] === 2){
-				const alias = this.tempAliases[roomId][sender];
-				const aliasData = {
-					pattern: alias,
-					aliasOf: command
-				}
-				if(!this.aliases[roomId]) this.aliases[roomId] = [aliasData];
-				else this.aliases[roomId].push(aliasData);
-				await this.writeFile();
-				await this.client.sendMessage(roomId, 'Alias set.');
-				delete this.steps[roomId][sender];
-				await this.client.unlockCommands(sender, roomId);
-				return;
-			}
-		}
 		if(command[0] !== this.prefix) {
 			if(!this.aliases[roomId]) return;
 			for(const a of this.aliases[roomId]){
@@ -84,22 +46,28 @@ export default class InviteHandler extends CommandHandler{
 			}
 			return;
 		}
-		const args = minimist(command.slice(1));
-		this.steps[roomId] = {};
-		if(!this.steps[roomId][sender]){
-			if(args._[0] === 'a' || args._[0] === 'add'){
-				await this.client.sendMessage(roomId, 'Please type the command you want to create.\nType \'.\' to make this command work with any messages.');
-				await this.client.lockCommands(sender, roomId, this.cid);
-				this.steps[roomId][sender] = 1;
-			}
+		const cmd = yargs().option('a', {
+			alias: 'alias',
+			type: 'array',
+		}).option('o', {
+			alias: ['orig', 'original'],
+			type: 'array'
+		}).string(['a', 'o']).demandOption(['o']).requiresArg(['a', 'o']).exitProcess(false);
+		const args = cmd.parseSync(command.slice(1));
+		const aliasData: Alias = {
+			pattern: args.a ? args.a : [],
+			aliasOf: args.o
 		}
+		if(!this.aliases[roomId]) this.aliases[roomId] = [aliasData];
+		else this.aliases[roomId].push(aliasData);
+		await this.writeFile();
+		await this.client.sendMessage(roomId, 'Alias set.');
+		await this.client.unlockCommands(sender, roomId);
+		return;
 	}
 	
 	parse(pattern: readonly string[], command: readonly string[]): null | {remainder: string[]}{
 		let i = 0;
-		if(pattern[0] === '.') return {
-			remainder: [...command]
-		}
 		for(; i < pattern.length; i++) if(pattern[i] !== command[i]) return null;
 		return {
 			remainder: command.slice(i)
