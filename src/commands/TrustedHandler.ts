@@ -4,7 +4,7 @@ import CommandHandler from "./CommandHandler";
 export default class TrustedHandler extends CommandHandler{
 	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
 		if(command[0] !== this.prefix) return;
-		const cmd = yargs().scriptName('!trust').help(false).exitProcess(false).command(['add', 'a'], 'Add new trusted users', async (cmd) => {
+		const cmd = yargs().scriptName('!trust').help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new trusted users', async (cmd) => {
 			const args = await cmd.string(['_']).option('o', {
 				alias: 'overwrite',
 				type: 'boolean'
@@ -29,7 +29,9 @@ export default class TrustedHandler extends CommandHandler{
 			await this.client.sendMessage(roomId, `The following users have been removed to the trusted list:\n${input.join('\n')}`);
 		}).command(['list', 'ls'], 'List trusted users', async (cmd) => {
 			await this.client.sendMessage(roomId, 'List of trusted users:\n' + this.client.trusted.trusted.join('\n'));
-		}).option('h', {
+		}).demandCommand(1).showHelp(async (m) => {
+			await this.client.sendMessage(roomId, m);
+		}).showHelpOnFail(false).option('h', {
 			alias: 'help',
 			type: 'boolean',
 		});
