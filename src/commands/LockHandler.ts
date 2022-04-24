@@ -1,16 +1,15 @@
+import yargs from "yargs/yargs";
 import CommandHandler from "./CommandHandler";
-import minimist from 'minimist';
 
 export default class EchoHandler extends CommandHandler{
 	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
 		if(command[0] !== this.prefix) return;
-		const args = minimist(command.slice(1), {
-			boolean: ['info'],
-			alias: {
-				'info': ['i']
-			}
-		});
-		if(args.info) {
+		const cmd = yargs().option('i', {
+			alias: 'info',
+			type: 'boolean',
+		}).exitProcess(false);
+		const args = cmd.parseSync(command.slice(1));
+		if(args.i) {
 			const lock = await this.client.getLock(sender, roomId);
 			if(!lock){
 				await this.client.sendMessage(roomId, `You are already unlocked.`);
