@@ -419,7 +419,10 @@ export default class Client{
 	}
 
 	async handleCommand(message: Command, sender: string, roomId: string){
-		for(const h of this.handlers) h.onMessage(message, sender, roomId);
+		for(const h of this.handlers) {
+			if(message.ignore.includes(h.cid)) continue;
+			await h.onMessage(message, sender, roomId);
+		}
 	}
 
 	async changeTrustedList(newList: string[]): Promise<void>{
