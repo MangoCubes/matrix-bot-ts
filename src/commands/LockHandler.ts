@@ -1,14 +1,15 @@
 import yargs from "yargs/yargs";
+import Command from "../class/Command";
 import CommandHandler from "./CommandHandler";
 
 export default class EchoHandler extends CommandHandler{
-	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
-		if(command[0] !== this.prefix) return;
+	async handleMessage(command: Command, sender: string, roomId: string): Promise<void> {
+		if(command.getName() !== this.prefix) return;
 		const cmd = yargs().option('i', {
 			alias: 'info',
 			type: 'boolean',
 		}).exitProcess(false);
-		const args = cmd.parseSync(command.slice(1));
+		const args = cmd.parseSync(command.command.slice(1));
 		if(args.i) {
 			const lock = await this.client.getLock(sender, roomId);
 			if(!lock){

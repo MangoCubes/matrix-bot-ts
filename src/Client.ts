@@ -14,6 +14,8 @@ import { promises as fs } from 'fs';
 import TrustedHandler from './commands/TrustedHandler';
 import LockHandler from './commands/LockHandler';
 import AliasHandler from './commands/AliasHandler';
+import CurlHandler from './commands/CurlHandler';
+import Command from './class/Command';
 
 
 type RoomCreationOptions = {
@@ -389,7 +391,7 @@ export default class Client{
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const roomId = data.getRoomId();
 			if(!roomId) return;
-			await this.handleCommand(e.clearEvent.content.body as string, data.getSender(), roomId);
+			await this.handleCommand(new Command(e.clearEvent.content.body as string, []), data.getSender(), roomId);
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
 			else {
@@ -416,9 +418,8 @@ export default class Client{
 		} else return this.lock[roomId][userId] ? this.lock[roomId][userId] : null;
 	}
 
-	async handleCommand(message: string, sender: string, roomId: string){
-		const cmd = message.split(' ');
-		for(const h of this.handlers) h.onMessage(cmd, sender, roomId);
+	async handleCommand(message: Command, sender: string, roomId: string){
+		for(const h of this.handlers) h.onMessage(message, sender, roomId);
 	}
 
 	async changeTrustedList(newList: string[]): Promise<void>{

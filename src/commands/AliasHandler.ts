@@ -4,6 +4,7 @@ import CommandHandler from "./CommandHandler";
 import fs from 'fs';
 import path from "path";
 import yargs from "yargs/yargs";
+import Command from "../class/Command";
 
 interface Alias{
 	pattern: readonly string[];
@@ -32,14 +33,14 @@ export default class InviteHandler extends CommandHandler{
 		writer.close();
 	}
 
-	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
-		if(command[0] !== this.prefix) {
+	async handleMessage(command: Command, sender: string, roomId: string): Promise<void> {
+		if(command.getName() !== this.prefix) {
 			if(!this.aliases[roomId]) return;
 			for(const a of this.aliases[roomId]){
-				const res = this.parse(a.pattern, command);
+				const res = this.parse(a.pattern, command.command);
 				if(res === null) continue;
 				else {
-					const newCommand = [...a.aliasOf, ...res.remainder].join(' ');
+					const newCommand = new Command([...a.aliasOf, ...res.remainder], [this.cid]);
 					await this.client.handleCommand(newCommand, sender, roomId);
 					return;
 				}
@@ -60,7 +61,7 @@ export default class InviteHandler extends CommandHandler{
 			}).option('o', {
 				alias: ['orig', 'original'],
 				type: 'array'
-			}).string(['a', 'o']).requiresArg(['a', 'o']).parseAsync(command.slice(2));
+			}).string(['a', 'o']).requiresArg(['a', 'o']).parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
 				helpShown = true;
@@ -81,7 +82,7 @@ export default class InviteHandler extends CommandHandler{
 				return;
 			}
 		}).command(['remove', 'r'], 'Remove aliases', async (cmd) => {
-			const args = await cmd.usage('!alias remove <AliasID...>').parseAsync(command.slice(2));
+			const args = await cmd.usage('!alias remove <AliasID...>').parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
 				helpShown = true;
@@ -92,7 +93,7 @@ export default class InviteHandler extends CommandHandler{
 					await this.client.sendMessage(roomId, 'This room does not have any aliases to remove.');
 					return;
 				}
-				const args = await cmd.number('_').parseAsync(command.slice(2));
+				const args = await cmd.number('_').parseAsync(command.command.slice(2));
 				let input = [];
 				for(const n of args._) {
 					if(typeof(n) === 'number') input.push(n - 1);
@@ -119,7 +120,7 @@ export default class InviteHandler extends CommandHandler{
 				return;
 			}
 		}).command(['list', 'ls'], 'List aliases', async (cmd) => {
-			const args = await cmd.usage('!alias list').parseAsync(command.slice(2));
+			const args = await cmd.usage('!alias list').parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
 				helpShown = true;
@@ -139,7 +140,7 @@ export default class InviteHandler extends CommandHandler{
 				}
 			}
 		});
-		const args = await cmd.parseAsync(command.slice(1));
+		const args = await cmd.parseAsync(command.command.slice(1));
 		if (failed) await this.client.sendMessage(roomId, failed);
 		else if (args.h && !helpShown) await this.client.sendMessage(roomId, await cmd.getHelp());
 	}

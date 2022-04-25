@@ -1,14 +1,15 @@
 import yargs from "yargs/yargs";
+import Command from "../class/Command";
 import CommandHandler from "./CommandHandler";
 
 export default class TrustedHandler extends CommandHandler{
-	async handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void> {
-		if(command[0] !== this.prefix) return;
+	async handleMessage(command: Command, sender: string, roomId: string): Promise<void> {
+		if(command.getName() !== this.prefix) return;
 		const cmd = yargs().scriptName('!trust').help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new trusted users', async (cmd) => {
 			const args = await cmd.string(['_']).option('o', {
 				alias: 'overwrite',
 				type: 'boolean'
-			}).parseAsync(command.slice(2));
+			}).parseAsync(command.command.slice(2));
 			const input = this.normaliseNames(args._);
 			let newUserList = [];
 			if(args.o) newUserList = [...input];
@@ -19,7 +20,7 @@ export default class TrustedHandler extends CommandHandler{
 			await this.changeUsers(newUserList);
 			await this.client.sendMessage(roomId, `The following users have been added to the trusted list:\n${this.client.trusted.trusted.join('\n')}`);
 		}).command(['remove', 'r'], 'Remove trusted users', async (cmd) => {
-			const args = await cmd.parseAsync(command.slice(2));
+			const args = await cmd.parseAsync(command.command.slice(2));
 			const input = this.normaliseNames(args._);
 			let newUserList = [];
 			const tempSet = new Set<string>(this.client.trusted.trusted);
@@ -35,7 +36,7 @@ export default class TrustedHandler extends CommandHandler{
 			alias: 'help',
 			type: 'boolean',
 		});
-		const args = await cmd.parseAsync(command.slice(1));
+		const args = await cmd.parseAsync(command.command.slice(1));
 		if(args.h){
 			await this.client.sendMessage(roomId, await cmd.getHelp());
 			return;

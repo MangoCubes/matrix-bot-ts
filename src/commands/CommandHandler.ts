@@ -1,6 +1,7 @@
 import MessageError from "../class/error/MessageError";
 import Client from "../Client";
 import crypto from 'crypto';
+import Command from "../class/Command";
 
 interface Config{
 	ignoreLock?: boolean;
@@ -17,7 +18,7 @@ export default abstract class CommandHandler{
 		this.cid = crypto.randomUUID();
 		this.options = options ? options : {};
 	}
-	async onMessage(command: string[], sender: string, roomId: string): Promise<void>{
+	async onMessage(command: Command, sender: string, roomId: string): Promise<void>{
 		if(!this.options.ignoreLock){
 			if(!this.client.lock[roomId]){
 				this.client.lock[roomId] = {};
@@ -37,5 +38,5 @@ export default abstract class CommandHandler{
 		}
 		
 	}
-	abstract handleMessage(command: readonly string[], sender: string, roomId: string): Promise<void>;
+	abstract handleMessage(command: Command, sender: string, roomId: string): Promise<void>;
 }
