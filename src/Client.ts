@@ -418,11 +418,12 @@ export default class Client{
 		} else return this.lock[roomId][userId] ? this.lock[roomId][userId] : null;
 	}
 
-	async handleCommand(message: Command, sender: string, roomId: string){
+	async handleCommand(message: Command, sender: string, roomId: string): Promise<boolean>{
 		for(const h of this.handlers) {
 			if(message.ignore.includes(h.cid)) continue;
-			await h.onMessage(message, sender, roomId);
+			if(await h.onMessage(message, sender, roomId)) return true;
 		}
+		return false;
 	}
 
 	async changeTrustedList(newList: string[]): Promise<void>{

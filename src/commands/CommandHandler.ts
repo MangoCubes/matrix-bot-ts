@@ -18,16 +18,16 @@ export default abstract class CommandHandler{
 		this.cid = crypto.randomUUID();
 		this.options = options ? options : {};
 	}
-	async onMessage(command: Command, sender: string, roomId: string): Promise<void>{
+	async onMessage(command: Command, sender: string, roomId: string): Promise<boolean>{
 		if(!this.options.ignoreLock){
 			if(!this.client.lock[roomId]){
 				this.client.lock[roomId] = {};
-				return;
+				return false;
 			}
-			if(this.client.lock[roomId][sender] && this.cid !== this.client.lock[roomId][sender]) return;
+			if(this.client.lock[roomId][sender] && this.cid !== this.client.lock[roomId][sender]) return false;
 		}
 		try{
-			await this.handleMessage(command, sender, roomId); //Try sending message back
+			return await this.handleMessage(command, sender, roomId); //Try sending message back
 		} catch (e) {
 			if(e instanceof MessageError) console.log(e); //If sending fails, print error
 			else try{
@@ -35,8 +35,9 @@ export default abstract class CommandHandler{
 			} catch(e) {
 				console.log(e); //If that fails, print error instead
 			}
+			return false;
 		}
 		
 	}
-	abstract handleMessage(command: Command, sender: string, roomId: string): Promise<void>;
+	abstract handleMessage(command: Command, sender: string, roomId: string): Promise<boolean>;
 }

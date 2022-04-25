@@ -3,8 +3,8 @@ import Command from "../class/Command";
 import CommandHandler from "./CommandHandler";
 
 export default class EchoHandler extends CommandHandler{
-	async handleMessage(command: Command, sender: string, roomId: string): Promise<void> {
-		if(command.getName() !== this.prefix) return;
+	async handleMessage(command: Command, sender: string, roomId: string): Promise<boolean> {
+		if(command.getName() !== this.prefix) return false;
 		const cmd = yargs().option('i', {
 			alias: 'info',
 			type: 'boolean',
@@ -14,7 +14,7 @@ export default class EchoHandler extends CommandHandler{
 			const lock = await this.client.getLock(sender, roomId);
 			if(!lock){
 				await this.client.sendMessage(roomId, `You are already unlocked.`);
-				return;
+				return true;
 			}
 			const command = this.client.handlers.find((v) => v.cid === lock);
 			if(!command) {
@@ -29,5 +29,6 @@ export default class EchoHandler extends CommandHandler{
 				await this.client.sendMessage(roomId, `You have been unlocked.`);
 			} else await this.client.sendMessage(roomId, `You are already unlocked.`);	
 		}
+		return true;
 	}
 }

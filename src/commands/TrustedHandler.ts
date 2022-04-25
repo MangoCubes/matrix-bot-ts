@@ -3,8 +3,8 @@ import Command from "../class/Command";
 import CommandHandler from "./CommandHandler";
 
 export default class TrustedHandler extends CommandHandler{
-	async handleMessage(command: Command, sender: string, roomId: string): Promise<void> {
-		if(command.getName() !== this.prefix) return;
+	async handleMessage(command: Command, sender: string, roomId: string): Promise<boolean> {
+		if(command.getName() !== this.prefix) return false;
 		const cmd = yargs().scriptName('!trust').help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new trusted users', async (cmd) => {
 			const args = await cmd.string(['_']).option('o', {
 				alias: 'overwrite',
@@ -39,8 +39,9 @@ export default class TrustedHandler extends CommandHandler{
 		const args = await cmd.parseAsync(command.command.slice(1));
 		if(args.h){
 			await this.client.sendMessage(roomId, await cmd.getHelp());
-			return;
+			return true;
 		}
+		return true;
 	}
 
 	normaliseNames(usernames: (string | number)[]){

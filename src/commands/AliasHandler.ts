@@ -33,19 +33,18 @@ export default class InviteHandler extends CommandHandler{
 		writer.close();
 	}
 
-	async handleMessage(command: Command, sender: string, roomId: string): Promise<void> {
+	async handleMessage(command: Command, sender: string, roomId: string): Promise<boolean> {
 		if(command.getName() !== this.prefix) {
-			if(!this.aliases[roomId]) return;
+			if(!this.aliases[roomId]) return false;
 			for(const a of this.aliases[roomId]){
 				const res = this.parse(a.pattern, command.command);
 				if(res === null) continue;
 				else {
 					const newCommand = new Command([...a.aliasOf, ...res.remainder], [this.cid]);
-					await this.client.handleCommand(newCommand, sender, roomId);
-					return;
+					return await this.client.handleCommand(newCommand, sender, roomId);
 				}
 			}
-			return;
+			return false;
 		}
 		let failed: string | null = null;
 		let helpShown = false;
@@ -143,6 +142,7 @@ export default class InviteHandler extends CommandHandler{
 		const args = await cmd.parseAsync(command.command.slice(1));
 		if (failed) await this.client.sendMessage(roomId, failed);
 		else if (args.h && !helpShown) await this.client.sendMessage(roomId, await cmd.getHelp());
+		return true;
 	}
 	
 	parse(pattern: readonly string[], command: readonly string[]): null | {remainder: string[]}{
