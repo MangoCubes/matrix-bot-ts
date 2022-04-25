@@ -72,8 +72,10 @@ export default class Client{
 			new InviteHandler(this, '!invite'),
 			new PurgeHandler(this, '!purge'),
 			new TrustedHandler(this, '!trust'),
+			new LockHandler(this, '!lock'),
+
+			/* Make sure AliasHandler is last to make sure it catches something that didn't trigger any commands.*/
 			new AliasHandler(this, '!alias', './config/commands/alias.json'),
-			new LockHandler(this, '!lock')
 		];
 		this.lock = {};
 	}
