@@ -81,7 +81,7 @@ export default class InviteHandler extends CommandHandler{
 				await this.client.sendMessage(roomId, 'Alias set.');
 				return;
 			}
-		}).command(['remove', 'r'], 'Remove aliases', async (cmd) => {
+		}).command(['remove', 'rm', 'r'], 'Remove aliases', async (cmd) => {
 			const args = await cmd.usage('!alias remove <AliasID...>').parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
@@ -102,19 +102,19 @@ export default class InviteHandler extends CommandHandler{
 						if(!isNaN(parsed)) input.push(parsed - 1);
 					}
 				}
-				input.sort();
+				input.sort().reverse();
 				let removed = [];
 				for(const n of input){
 					if(n >= this.aliases[roomId].length) continue;
-					for(let i = this.aliases[roomId].length - 1; i >= 0; i--){
-						this.aliases[roomId].splice(n, 1);
-						removed.push(n);
-					}
+					this.aliases[roomId].splice(n, 1);
+					removed.push(n);
 				}
 				if(!removed.length){
 					await this.client.sendMessage(roomId, `No aliases removed.`);
 					return;
 				}
+				for(let i = 0; i < removed.length; i++) removed[i]++;
+				removed.reverse();
 				await this.writeFile();
 				await this.client.sendMessage(roomId, `Alias with ID ${removed.join(', ')} has been removed.`);
 				return;
