@@ -14,8 +14,7 @@ import { promises as fs } from 'fs';
 import TrustedHandler from './commands/TrustedHandler';
 import LockHandler from './commands/LockHandler';
 import AliasHandler from './commands/AliasHandler';
-import CurlHandler from './commands/CurlHandler';
-import Command from './class/Command';
+import Command, { ParsingError } from './class/Command';
 
 
 type RoomCreationOptions = {
@@ -393,9 +392,11 @@ export default class Client{
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const roomId = data.getRoomId();
 			if(!roomId) return;
-			await this.handleCommand(new Command(e.clearEvent.content.body as string, []), data.getSender(), roomId);
+			const cmd = new Command(e.clearEvent.content.body as string, []);
+			await this.handleCommand(cmd, data.getSender(), roomId);
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
+			else if(err instanceof ParsingError) await this.sendMessage(roomId, err.message);
 			else {
 				console.log('Error handling message: ');
 				console.log(err)
