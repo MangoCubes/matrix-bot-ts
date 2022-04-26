@@ -384,6 +384,22 @@ export default class Client{
 		}
 	}
 
+	async sendErrorMessage(roomId: string, message: string){
+		try{
+			await this.sendMessage(roomId, message);
+		} catch(e){
+			console.log('(-) Failed to send message.');
+		}
+	}
+
+	async sendErrorDM(userId: string, message: string){
+		try{
+			await this.sendDM(userId, message);
+		} catch(e){
+			console.log('(-) Failed to send private message.');
+		}
+	}
+
 	async messageHandler(roomId: string, data: MatrixEvent){
 		if (data.isRedacted()) return;
 		if (data.sender.userId === this.config.userId || !this.trusted.trusted.includes(data.sender.userId)) return;
@@ -395,8 +411,8 @@ export default class Client{
 			const cmd = new Command(e.clearEvent.content.body as string, []);
 			await this.handleCommand(cmd, data.getSender(), roomId);
 		} catch(err){
-			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendMessage(roomId, 'Re-creating new secure channel. Please try again.');
-			else if(err instanceof ParsingError) await this.sendMessage(roomId, err.message);
+			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendErrorMessage(roomId, 'Re-creating new secure channel. Please try again.');
+			else if(err instanceof ParsingError) await this.sendErrorMessage(roomId, err.message);
 			else {
 				console.log('Error handling message: ');
 				console.log(err)

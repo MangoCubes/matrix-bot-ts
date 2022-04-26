@@ -30,11 +30,7 @@ export default abstract class CommandHandler{
 			return await this.handleMessage(command, sender, roomId); //Try sending message back
 		} catch (e) {
 			if(e instanceof MessageError) console.log(e); //If sending fails, print error
-			else try{
-				await this.client.sendDM(sender, JSON.stringify((e as Error).stack)); //If not, try sending error back
-			} catch(e) {
-				console.log(e); //If that fails, print error instead
-			}
+			else await this.client.sendErrorDM(sender, JSON.stringify((e as Error).stack));
 			return false;
 		}
 		
