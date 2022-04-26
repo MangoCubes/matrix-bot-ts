@@ -15,6 +15,7 @@ import TrustedHandler from './commands/TrustedHandler';
 import LockHandler from './commands/LockHandler';
 import AliasHandler from './commands/AliasHandler';
 import Command, { ParsingError } from './class/Command';
+import CurlHandler from './commands/CurlHandler';
 
 
 type RoomCreationOptions = {
@@ -72,6 +73,7 @@ export default class Client{
 			new PurgeHandler(this, '!purge'),
 			new TrustedHandler(this, '!trust'),
 			new LockHandler(this, '!lock'),
+			new CurlHandler(this, '!curl'),
 
 			/* Make sure AliasHandler is last to make sure it catches something that didn't trigger any commands.*/
 			new AliasHandler(this, '!alias', './config/commands/alias.json'),

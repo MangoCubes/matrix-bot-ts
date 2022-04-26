@@ -6,7 +6,7 @@ export default class Command{
 	ignore: string[];
 	constructor(command: string | string[], ignore: string[]){
 		if(typeof(command) === 'string'){
-			const split = command.match(/\w+|"(\\"|[^"])+"/g);
+			const split = command.match(/[^"\s]+|"(?:\\"|[^"])+"/g);
 			if(!split) throw new ParsingError('Invalid quotes.');
 			else {
 				this.command = split;
