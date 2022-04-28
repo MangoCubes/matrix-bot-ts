@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, EventTimeline, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import sdk, { ClientEvent, EventTimeline, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RelationType, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
@@ -454,5 +454,15 @@ export default class Client{
 		const file = await fs.open(this.trustedDir, 'w');
 		await file.write(JSON.stringify(this.trusted));
 		await file.close();
+	}
+
+	async addReaction(roomId: string, msgId: string, emoji: string){
+		await this.client.sendEvent(roomId, EventType.Reaction, {
+			"m.relates_to": {
+				rel_type: RelationType.Annotation,
+				event_id: msgId,
+				key: emoji
+			}
+		})
 	}
 }
