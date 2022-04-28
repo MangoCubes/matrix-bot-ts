@@ -40,25 +40,27 @@ export default class DebugHandler extends CommandHandler{
 				headers[split[0].trim()] = split[1].trim();
 			}
 		}
-		let message = '';
+		let message;
 		const url = args._[0] as string;
 		if(args.request === 'GET'){
-			message = await axios.get(url, {
+			message = (await axios.get(url, {
 				headers: headers
-			});
-		} else if(args.request === 'POST') {
-			message = await axios.post(url, {
-				headers: headers,
-				body: args.data
-			});
-		} else if(args.request === 'PUT') {
-			message = await axios.put(url, {
-				headers: headers,
-				body: args.data
-			});
+			})).data;
+		} else {
+			const body = args.data ? JSON.parse(args.data) : undefined;
+			if(args.request === 'POST') {
+				message = (await axios.post(url, {
+					headers: headers,
+					body: args.data
+				})).data;
+			} else if(args.request === 'PUT') {
+				message = (await axios.put(url, {
+					headers: headers,
+					body: args.data
+				})).data;
+			}
 		}
-		
-		await this.client.sendMessage(roomId, message);
+		await this.client.sendMessage(roomId, JSON.stringify(message, null, 4));
 		return true;
 	}
 }
