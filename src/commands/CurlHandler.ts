@@ -7,21 +7,28 @@ export default class DebugHandler extends CommandHandler{
 	async handleMessage(command: Command, sender: string, roomId: string): Promise<boolean> {
 		if(command.getName() !== this.prefix) return false;
 		let failed: string | null = null;
-		const args = await yargs().scriptName('!curl').showHelpOnFail(false).option('h', {
-			alias: 'help',
+		const args = await yargs().scriptName('!curl').showHelpOnFail(false).option('help', {
+			alias: 'h',
 			type: 'boolean',
 		}).fail((m) => {
 			failed = m
 		}).help(false).version(false).exitProcess(false).option('request', {
 			alias: ['X'],
 			choices: ['GET', 'POST', 'PUT'],
-			default: 'GET'
+			default: 'GET',
+			description: 'Request type.'
 		}).option('data', {
 			alias: ['d'],
-			type: 'string'
+			type: 'string',
+			description: 'Data to send in POST/PUT request.'
 		}).option('header', {
 			alias: ['H'],
-			type: 'string'
+			type: 'string',
+			description: 'Add header. Use -H <Header> multiple times for multiple headers.'
+		}).option('silent', {
+			alias: ['s'],
+			type: 'boolean',
+			description: 'Suppress output, and add check reaction if result code is 200'
 		}).string(['data', 'header']).string('_').parseAsync(command.command.slice(1));
 		if(args.request === 'GET' && args.data) {
 			await this.client.sendMessage(roomId, 'You cannot have body for GET request.');
@@ -41,26 +48,42 @@ export default class DebugHandler extends CommandHandler{
 			}
 		}
 		let message;
+		let status
 		const url = args._[0] as string;
 		if(args.request === 'GET'){
-			message = (await axios.get(url, {
+			const res = await axios.get(url, {
 				headers: headers
-			})).data;
+			});
+			message = res.data;
+			status = res.status;
 		} else {
 			const body = args.data ? JSON.parse(args.data) : undefined;
 			if(args.request === 'POST') {
-				message = (await axios.post(url, {
+				const res = await axios.post(url, {
 					headers: headers,
-					body: args.data
-				})).data;
+					body: body
+				});
+				message = res.data;
+				status = res.status;
 			} else if(args.request === 'PUT') {
-				message = (await axios.put(url, {
+				const res = await axios.put(url, {
 					headers: headers,
-					body: args.data
-				})).data;
+					body: body
+				});
+				message = res.data;
+				status = res.status;
+			} else {
+				message = 'Invalid request type.';
+				status = '-'
 			}
 		}
-		await this.client.sendMessage(roomId, JSON.stringify(message, null, 4));
+		if(args.silent) {
+			const id = command.getEventId();
+			if (id) {
+				if(status === 200) await this.client.sendReaction(roomId, id, '✅');
+				else await this.client.sendReaction(roomId, id, status.toString());
+			} else this.client.sendMessage(roomId, 'Request success.');
+		} else await this.client.sendMessage(roomId, JSON.stringify(message, null, 4));
 		return true;
 	}
 }

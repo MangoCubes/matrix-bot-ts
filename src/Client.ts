@@ -456,7 +456,7 @@ export default class Client{
 		await file.close();
 	}
 
-	async addReaction(roomId: string, msgId: string, emoji: string){
+	async sendReaction(roomId: string, msgId: string, emoji: string){
 		await this.client.sendEvent(roomId, EventType.Reaction, {
 			"m.relates_to": {
 				rel_type: RelationType.Annotation,
