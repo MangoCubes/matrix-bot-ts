@@ -139,7 +139,7 @@ export default class InviteHandler extends CommandHandler{
 				}
 			}
 		});
-		const args = await cmd.parseAsync(command.command.slice(1));
+		const args = await cmd.parseAsync(command.getOptions());
 		if (failed) await this.client.sendMessage(roomId, failed);
 		else if (args.h && !helpShown) await this.client.sendMessage(roomId, await cmd.getHelp());
 		return true;

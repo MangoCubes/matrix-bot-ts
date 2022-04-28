@@ -36,7 +36,7 @@ export default class TrustedHandler extends CommandHandler{
 			alias: 'help',
 			type: 'boolean',
 		});
-		const args = await cmd.parseAsync(command.command.slice(1));
+		const args = await cmd.parseAsync(command.getOptions());
 		if(args.h){
 			await this.client.sendMessage(roomId, await cmd.getHelp());
 			return true;

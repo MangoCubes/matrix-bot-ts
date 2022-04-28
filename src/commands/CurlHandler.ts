@@ -29,7 +29,7 @@ export default class DebugHandler extends CommandHandler{
 			alias: ['s'],
 			type: 'boolean',
 			description: 'Suppress output, and add check reaction if result code is 200'
-		}).string(['data', 'header']).string('_').parseAsync(command.command.slice(1));
+		}).string(['data', 'header']).string('_').parseAsync(command.getOptions());
 		if(args.request === 'GET' && args.data) {
 			await this.client.sendMessage(roomId, 'You cannot have body for GET request.');
 			return true;

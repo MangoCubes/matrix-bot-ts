@@ -29,4 +29,7 @@ export default class Command{
 	getEventId() {
 		return this.eventId;
 	}
+	getOptions() {
+		return this.command.slice(1);
+	}
 }
