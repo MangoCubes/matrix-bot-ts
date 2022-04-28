@@ -40,7 +40,7 @@ export default class InviteHandler extends CommandHandler{
 				const res = this.parse(a.pattern, command.command);
 				if(res === null) continue;
 				else {
-					const newCommand = new Command([...a.aliasOf, ...res.remainder], [this.cid]);
+					const newCommand = new Command([...a.aliasOf, ...res.remainder], command.getEventId(), [this.cid]);
 					return await this.client.handleCommand(newCommand, sender, roomId);
 				}
 			}

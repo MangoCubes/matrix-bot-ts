@@ -410,7 +410,7 @@ export default class Client{
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
 			const roomId = data.getRoomId();
 			if(!roomId) return;
-			const cmd = new Command(e.clearEvent.content.body as string, []);
+			const cmd = new Command(e.clearEvent.content.body as string, data.event.event_id, []);
 			await this.handleCommand(cmd, data.getSender(), roomId);
 		} catch(err){
 			if(err instanceof DecryptionError && err.code === 'MEGOLM_UNKNOWN_INBOUND_SESSION_ID') await this.sendErrorMessage(roomId, 'Re-creating new secure channel. Please try again.');
