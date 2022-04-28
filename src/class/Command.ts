@@ -8,7 +8,21 @@ export default class Command{
 	constructor(command: string | string[], eventId: string | undefined, ignore: string[]){
 		this.eventId = eventId;
 		if(typeof(command) === 'string'){
-			const split = command.match(/[^"'\s]+|["'](?:\\"|[^"]|\\'|[^'])+["']/g);
+			const split = command.match(/[^"'\s]+|(["'])(?:\\"|[^"]|\\'|[^'])+\1/g);
+			/**
+			 * Regex explanation
+			 * 1st alternative: [^"'\s]+
+			 * 	- Matches anything that doesn't contain whitespace, ' or "
+			 * 2nd alternative: ["'](?:\\"|[^"]|\\'|[^'])+["']
+			 * 	- (["']): First capture group, matches a quotemark start
+			 *  - (?:\\"|[^"]|\\'|[^']): Non-capturing group, captures one of the following:
+			 * 		- \\": Captures \", escaped quotemark
+			 * 		- [^"]: Anything that isn't "
+			 * 		- \\': Captures \', escaped quotemark
+			 * 		- [^']: Anything that isn't '
+			 * 	- +: Capture 1+ of these, in a greedy manner
+			 * 	- \1: Backreference to first capture group, which is a closing quotemark
+			 */
 			if(!split) throw new ParsingError('Invalid quotes.');
 			else {
 				this.command = split;
