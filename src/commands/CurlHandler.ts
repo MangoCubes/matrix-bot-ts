@@ -29,7 +29,7 @@ export default class DebugHandler extends CommandHandler{
 			alias: ['s'],
 			type: 'boolean',
 			description: 'Suppress output, and add check reaction if result code is 200'
-		}).string(['data', 'header']).string('_').parseAsync(command.command.slice(1));
+		}).string(['data', 'header']).string('_').parseAsync(command.getOptions().options);
 		if(args.request === 'GET' && args.data) {
 			await this.client.sendMessage(roomId, 'You cannot have body for GET request.');
 			return true;
@@ -80,6 +80,7 @@ export default class DebugHandler extends CommandHandler{
 		if(args.silent) {
 			const id = command.getEventId();
 			if (id) {
+				console.log(status)
 				if(status === 200) await this.client.sendReaction(roomId, id, '✅');
 				else await this.client.sendReaction(roomId, id, status.toString());
 			} else this.client.sendMessage(roomId, 'Request success.');

@@ -9,7 +9,7 @@ export default class EchoHandler extends CommandHandler{
 			alias: 'info',
 			type: 'boolean',
 		}).exitProcess(false);
-		const args = cmd.parseSync(command.command.slice(1));
+		const args = cmd.parseSync(command.getOptions().options);
 		if(args.i) {
 			const lock = await this.client.getLock(sender, roomId);
 			if(!lock){

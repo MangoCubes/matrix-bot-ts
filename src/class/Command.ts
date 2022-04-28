@@ -2,28 +2,45 @@ export class ParsingError extends Error{
 }
 
 export default class Command{
-	command: string[];
+	command: {
+		options: string;
+		parsed: false;
+	} | {
+		options: string[];
+		parsed: true;
+	}
 	ignore: string[];
+	commandName: string;
 	eventId: string | undefined;
 	constructor(command: string | string[], eventId: string | undefined, ignore: string[]){
 		this.eventId = eventId;
 		if(typeof(command) === 'string'){
-			const split = command.match(/[^"\s]+|"(?:\\"|[^"])+"/g);
-			if(!split) throw new ParsingError('Invalid quotes.');
-			else {
-				this.command = split;
-				for(let i = 0; i < this.command.length; i++){
-					const match = this.command[i].match(/^"(.+)"$/);
-					if(match) this.command[i] = match[1];
-				}
+			const match = command.match(/^`([^`]+)`$/);
+			if (match) command = match[1];
+			const cmd = command.split(' ');
+			this.commandName = cmd[0];
+			this.command = {
+				options: cmd.slice(1).join(' '),
+				parsed: false
 			}
-		}else this.command = command;
+		} else {
+			this.commandName = command[0];
+			this.command = {
+				options: command.slice(1),
+				parsed: true
+			}
+		}
 		this.ignore = ignore;
 	}
 	getName() {
-		return this.command[0];
+		return this.commandName;
 	}
+
 	getEventId() {
 		return this.eventId;
+	}
+
+	getOptions(){
+		return this.command;
 	}
 }

@@ -9,7 +9,7 @@ export default class TrustedHandler extends CommandHandler{
 			const args = await cmd.string(['_']).option('o', {
 				alias: 'overwrite',
 				type: 'boolean'
-			}).parseAsync(command.command.slice(2));
+			}).parseAsync(command.getOptions().options);
 			const input = this.normaliseNames(args._);
 			let newUserList = [];
 			if(args.o) newUserList = [...input];
@@ -20,7 +20,7 @@ export default class TrustedHandler extends CommandHandler{
 			await this.changeUsers(newUserList);
 			await this.client.sendMessage(roomId, `The following users have been added to the trusted list:\n${this.client.trusted.trusted.join('\n')}`);
 		}).command(['remove', 'r'], 'Remove trusted users', async (cmd) => {
-			const args = await cmd.parseAsync(command.command.slice(2));
+			const args = await cmd.parseAsync(command.getOptions().options);
 			const input = this.normaliseNames(args._);
 			let newUserList = [];
 			const tempSet = new Set<string>(this.client.trusted.trusted);
@@ -36,7 +36,7 @@ export default class TrustedHandler extends CommandHandler{
 			alias: 'help',
 			type: 'boolean',
 		});
-		const args = await cmd.parseAsync(command.command.slice(1));
+		const args = await cmd.parseAsync(command.getOptions().options);
 		if(args.h){
 			await this.client.sendMessage(roomId, await cmd.getHelp());
 			return true;
