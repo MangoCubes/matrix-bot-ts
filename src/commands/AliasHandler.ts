@@ -9,7 +9,17 @@ import Command from "../class/Command";
 interface Alias{
 	pattern: readonly string[];
 	aliasOf: readonly string[];
+	wcCount: number;
+	hasMultipleMatch: boolean;
 }
+
+/**
+ * This command allows creating aliases of commands that are simply too long.
+ * It can also use wildcards: $? and $*
+ * $? can take only single string, whereas $* can take multiple.
+ * As a result, when setting alias, $? cannot come after $*
+ * Example use case: Triggering SMS sending task via !curl command
+ */
 
 export default class InviteHandler extends CommandHandler{
 	aliases: {
@@ -40,7 +50,31 @@ export default class InviteHandler extends CommandHandler{
 				const res = this.parse(a.pattern, command.command);
 				if(res === null) continue;
 				else {
-					const newCommand = new Command([...a.aliasOf, ...res.remainder], command.getEventId(), [this.cid]);
+					if(res.remainder.length < a.wcCount){
+						await this.client.sendMessage(roomId, `Insufficient arguments. This alias requires at least ${a.wcCount} arguments.`);
+						return true;
+					}
+					let newCommand: Command;
+					let updated = [...a.aliasOf];
+					let rem = [...res.remainder];
+					let params = rem.splice(0, a.wcCount - 1);
+					let counter = 0;
+					for(let i = 0; i < updated.length; i++){
+						updated[i] = updated[i].replace(/\$\?/, () => {
+							return params[counter++];
+						});
+					}
+					if (a.hasMultipleMatch){
+						for(let i = 0; i < updated.length; i++) {
+							if(/\$\*/.test(updated[i])){
+								updated[i] = updated[i].replace(/\$\*/, rem.join(' '));
+								break;
+							}
+						}
+						newCommand = new Command(updated, command.getEventId(), [this.cid]);
+					} else {
+						newCommand = new Command([...updated, ...rem], command.getEventId(), [this.cid]);
+					}
 					return await this.client.handleCommand(newCommand, sender, roomId);
 				}
 			}
@@ -70,10 +104,7 @@ export default class InviteHandler extends CommandHandler{
 					this.client.sendMessage(roomId, 'Original command must be present.');
 					return;
 				}
-				const aliasData: Alias = {
-					pattern: args.a ? args.a : [],
-					aliasOf: args.o
-				}
+				const aliasData = this.parseAlias(args.a, args.o);
 				if(!this.aliases[roomId]) this.aliases[roomId] = [aliasData];
 				else this.aliases[roomId].push(aliasData);
 				await this.writeFile();
@@ -150,6 +181,29 @@ export default class InviteHandler extends CommandHandler{
 		for(; i < pattern.length; i++) if(pattern[i] !== command[i]) return null;
 		return {
 			remainder: command.slice(i)
+		}
+	}
+
+	parseAlias(alias: readonly string[] | undefined, original: readonly string[]): Alias{
+		let count = 0;
+		let hasMultipleMatch = false;
+		for(const o of original){
+			const match = o.match(/\$\?/g);
+			if (match) count += match.length;
+		}
+		for(const o of original){
+			const match = o.match(/\$\*/g);
+			if (match) {
+				count += match.length;
+				hasMultipleMatch = true;
+				break;
+			}
+		}
+		return {
+			pattern: alias ? alias : [],
+			aliasOf: original,
+			wcCount: count,
+			hasMultipleMatch: hasMultipleMatch
 		}
 	}
 }

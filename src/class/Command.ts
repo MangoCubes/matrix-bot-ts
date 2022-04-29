@@ -33,8 +33,7 @@ export default class Command{
 					this.command[i] = this.command[i].replace(/\\'/g, "'");
 				}
 			}
-			console.log(this.command)
-		}else this.command = command;
+		} else this.command = command;
 		this.ignore = ignore;
 	}
 	getName() {
