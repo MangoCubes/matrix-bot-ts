@@ -7,8 +7,8 @@ import yargs from "yargs/yargs";
 import Command from "../class/Command";
 
 interface Alias{
-	pattern: readonly string[];
-	aliasOf: readonly string[];
+	pattern: string | null;
+	aliasOf: string;
 	wcCount: number;
 	hasMultipleMatch: boolean;
 }
@@ -54,27 +54,15 @@ export default class InviteHandler extends CommandHandler{
 						await this.client.sendMessage(roomId, `Insufficient arguments. This alias requires at least ${a.wcCount} arguments.`);
 						return true;
 					}
-					let newCommand: Command;
-					let updated = [...a.aliasOf];
+					let updated = a.aliasOf;
 					let rem = [...res.remainder];
 					let params = rem.splice(0, a.wcCount - 1);
 					let counter = 0;
-					for(let i = 0; i < updated.length; i++){
-						updated[i] = updated[i].replace(/\$\?/, () => {
-							return params[counter++];
-						});
-					}
-					if (a.hasMultipleMatch){
-						for(let i = 0; i < updated.length; i++) {
-							if(/\$\*/.test(updated[i])){
-								updated[i] = updated[i].replace(/\$\*/, rem.join(' '));
-								break;
-							}
-						}
-						newCommand = new Command(updated, command.getEventId(), [this.cid]);
-					} else {
-						newCommand = new Command([...updated, ...rem], command.getEventId(), [this.cid]);
-					}
+					updated = updated.replace(/\$\?/g, () => {
+						return params[counter++];
+					});
+					if (a.hasMultipleMatch)	updated = updated.replace(/\$\*/, rem.join(' '));
+					const newCommand = new Command(updated, command.getEventId(), [this.cid]);
 					return await this.client.handleCommand(newCommand, sender, roomId);
 				}
 			}
@@ -90,10 +78,10 @@ export default class InviteHandler extends CommandHandler{
 		}).help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new alias', async (cmd) => {
 			const args = await cmd.usage('!alias add [-a <alias...>] -o <original...>').option('a', {
 				alias: 'alias',
-				type: 'array',
+				type: 'string',
 			}).option('o', {
 				alias: ['orig', 'original'],
-				type: 'array'
+				type: 'string'
 			}).string(['a', 'o']).requiresArg(['a', 'o']).parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
@@ -164,7 +152,7 @@ export default class InviteHandler extends CommandHandler{
 					let msg = [];
 					for(let i = 0; i < this.aliases[roomId].length; i++){
 						const a = this.aliases[roomId][i];
-						msg.push(`${i + 1}: ${a.pattern.length ? a.pattern.join(' ') : '<Any>'} -> ${a.aliasOf.join(' ')}`);
+						msg.push(`${i + 1}: ${a.pattern ? a.pattern : '<Any>'} -> ${a.aliasOf}`);
 					}
 					await this.client.sendMessage(roomId, `List of aliases (Alias -> Translates to):\n${msg.join('\n')}`);
 				}
@@ -176,31 +164,29 @@ export default class InviteHandler extends CommandHandler{
 		return true;
 	}
 	
-	parse(pattern: readonly string[], command: readonly string[]): null | {remainder: string[]}{
+	parse(pattern: string | null, command: readonly string[]): null | {remainder: string[]}{
 		let i = 0;
-		for(; i < pattern.length; i++) if(pattern[i] !== command[i]) return null;
+		if(pattern){
+			const splitted = pattern.split(' ');
+			for(; i < splitted.length; i++) if(splitted[i] !== command[i]) return null;
+		}
 		return {
 			remainder: command.slice(i)
 		}
 	}
 
-	parseAlias(alias: readonly string[] | undefined, original: readonly string[]): Alias{
+	parseAlias(alias: string | undefined, original: string): Alias{
 		let count = 0;
 		let hasMultipleMatch = false;
-		for(const o of original){
-			const match = o.match(/\$\?/g);
-			if (match) count += match.length;
-		}
-		for(const o of original){
-			const match = o.match(/\$\*/g);
-			if (match) {
-				count += match.length;
-				hasMultipleMatch = true;
-				break;
-			}
+		const match = original.match(/\$\?/g);
+		if (match) count += match.length;
+		const multipleMatch = original.match(/\$\*/g);
+		if (multipleMatch) {
+			count += multipleMatch.length;
+			hasMultipleMatch = true;
 		}
 		return {
-			pattern: alias ? alias : [],
+			pattern: alias ? alias : null,
 			aliasOf: original,
 			wcCount: count,
 			hasMultipleMatch: hasMultipleMatch

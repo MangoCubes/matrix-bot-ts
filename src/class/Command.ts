@@ -23,7 +23,7 @@ export default class Command{
 }
 
 export function commandParser(command: string){
-	const split = command.match(/(?:\\\\"|\\\\'|[^"'\s])+|(["'])(?:\\"|[^"]|\\'|[^'])+?\1/g);
+	const split = command.match(/(?:\\"|\\'|[^"'\s])+|(["'])(?:\\"|[^"]|\\'|[^'])+?\1/g);
 	/**
 	 * Regex explanation
 	 * 1st alternative: [^"'\s]+
