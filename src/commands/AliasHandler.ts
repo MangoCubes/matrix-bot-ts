@@ -72,12 +72,14 @@ export default class InviteHandler extends CommandHandler{
 		}
 		let failed: string | null = null;
 		let helpShown = false;
+		let handled = false;
 		const cmd = yargs().scriptName('!alias').showHelpOnFail(false).option('h', {
 			alias: 'help',
 			type: 'boolean',
 		}).fail((m) => {
 			failed = m
 		}).help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new alias', async (cmd) => {
+			handled = true;
 			const args = await cmd.usage('!alias add [-a <alias...>] -o <original...>').option('a', {
 				alias: 'alias',
 				type: 'string',
@@ -102,6 +104,7 @@ export default class InviteHandler extends CommandHandler{
 				return;
 			}
 		}).command(['remove', 'rm', 'r'], 'Remove aliases', async (cmd) => {
+			handled = true;
 			const args = await cmd.usage('!alias remove <AliasID...>').parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
@@ -140,6 +143,7 @@ export default class InviteHandler extends CommandHandler{
 				return;
 			}
 		}).command(['list', 'ls'], 'List aliases', async (cmd) => {
+			handled = true;
 			const args = await cmd.usage('!alias list').parseAsync(command.command.slice(2));
 			if (args.h) {
 				await this.client.sendMessage(roomId, await cmd.getHelp());
@@ -162,7 +166,7 @@ export default class InviteHandler extends CommandHandler{
 		});
 		const args = await cmd.parseAsync(command.getOptions());
 		if (failed) await this.client.sendMessage(roomId, failed);
-		else if (args.h && !helpShown) await this.client.sendMessage(roomId, await cmd.getHelp());
+		else if ((args.h && !helpShown) || !handled) await this.client.sendMessage(roomId, await cmd.getHelp());
 		return true;
 	}
 	

@@ -6,12 +6,16 @@ export default class TrustedHandler extends CommandHandler{
 	async handleMessage(command: Command, sender: string, roomId: string): Promise<boolean> {
 		if(command.getName() !== this.prefix) return false;
 		let handled = false;
+		let failed: string | null = null;
+		let helpShown = false;
 		const cmd = yargs().scriptName('!trust').help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new trusted users', async (cmd) => {
 			handled = true;
 			const args = await cmd.string(['_']).parseAsync(command.command.slice(2));
 			const input = this.normaliseNames(args._);
 			await this.client.db.addTrustedUser(input);
 			await this.client.sendMessage(roomId, `The following users have been added to the trusted list:\n${input.join('\n')}`);
+		}).fail((m) => {
+			failed = m
 		}).command(['remove', 'r', 'rm', 'del'], 'Remove trusted users', async (cmd) => {
 			handled = true;
 			const args = await cmd.parseAsync(command.command.slice(2));
@@ -27,10 +31,11 @@ export default class TrustedHandler extends CommandHandler{
 		});
 		try{
 			const args = await cmd.parseAsync(command.getOptions());
-			if(args.h || !handled){
+			if (failed) await this.client.sendMessage(roomId, failed);
+			if ((args.h && !helpShown) || !handled){
 				await this.client.sendMessage(roomId, await cmd.getHelp());
-				return true;
 			}
+			return true;
 		} catch (e) {
 			if(e instanceof Error) await this.client.sendErrorMessage(roomId, e.message);
 		}
