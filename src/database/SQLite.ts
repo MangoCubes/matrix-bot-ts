@@ -59,7 +59,8 @@ export default class SQLite{
 
 	init(){
         try {
-            this.db.exec('CREATE TABLE IF NOT EXISTS rss (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT);');
+			this.db.exec('PRAGMA foreign_keys = ON;');
+            this.db.exec('CREATE TABLE IF NOT EXISTS rss (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, url TEXT, FOREIGN KEY (user) REFERENCES trusted(user));');
 			this.db.exec('CREATE TABLE IF NOT EXISTS trusted (user TEXT PRIMARY KEY);');
         } catch(e){
             if(process.env.NODE_ENV === 'development') throw e;
