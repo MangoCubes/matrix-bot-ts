@@ -5,7 +5,15 @@ export default class SQLite{
 		this.db = new DatabaseConstructor(dir);
 	}
 
-	async getRSSUrl(url: string): Promise<{id: number, url: string}[]>{
+	async deleteRSSUrl(ids: number[]){
+		const stmt = this.db.prepare('DELETE FROM rss WHERE id = ?;');
+		const tr = this.db.transaction(() => {
+			for (const id of ids) stmt.run(id);
+        });
+		tr();
+	}
+
+	async getRSSUrl(): Promise<{id: number, url: string}[]>{
 		const stmt = this.db.prepare('SELECT id, url FROM rss;');
 		const res = stmt.all();
 		let ret: Awaited<ReturnType<SQLite['getRSSUrl']>> = [];
