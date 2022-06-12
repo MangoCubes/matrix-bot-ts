@@ -9,7 +9,7 @@ import DebugHandler from './commands/DebugHandler';
 import EchoHandler from './commands/EchoHandler';
 import InviteHandler from './commands/InviteHandler';
 import PurgeHandler from './commands/PurgeHandler';
-import { ConfigFile, TrustedFile } from './generateConfig';
+import { ConfigFile } from './generateConfig';
 import { promises as fs } from 'fs';
 import TrustedHandler from './commands/TrustedHandler';
 import LockHandler from './commands/LockHandler';
@@ -17,7 +17,6 @@ import AliasHandler from './commands/AliasHandler';
 import Command, { ParsingError } from './class/Command';
 import CurlHandler from './commands/CurlHandler';
 import SQLite from './database/SQLite';
-import { createPickleKey } from './crypto/PickleKey';
 import RSSHandler from './commands/RSSHandler';
 
 
@@ -32,7 +31,6 @@ export default class Client{
 	config: ConfigFile;
 	debugMode: boolean;
 	dmRooms: {[uid: string]: string};
-	trusted: TrustedFile;
 	handlers: CommandHandler[];
 	configDir: string;
 	trustedDir: string;
@@ -44,7 +42,6 @@ export default class Client{
 		this.configDir = configDir;
 		this.trustedDir = trustedDir;
 		const config = JSON.parse(readFileSync(configDir, 'utf8'));
-		const trusted = JSON.parse(readFileSync(trustedDir, 'utf8'));
 		this.config = {
 			serverUrl: config.configUrl,
 			accessToken: config.accessToken,
@@ -53,9 +50,6 @@ export default class Client{
 			deviceId: config.deviceId,
 			logRoom: config.logRoom,
 			serverName: config.serverName
-		}
-		this.trusted = {
-			trusted: trusted.trusted
 		}
 		const cryptoStore = new LocalStorageCryptoStore(new LocalStorage(config.storage));
 		const sessionStore = new MemoryCryptoStore();
@@ -412,7 +406,8 @@ export default class Client{
 
 	async messageHandler(roomId: string, data: MatrixEvent){
 		if (data.isRedacted()) return;
-		if (data.sender.userId === this.config.userId || !this.trusted.trusted.includes(data.sender.userId)) return;
+		if (data.sender.userId === this.config.userId) return;
+		if (!await this.db.isTrusted(data.sender.userId)) return;
 		try{
 			const e = await this.client.crypto.decryptEvent(data);
 			if(e.clearEvent.content.msgtype === MsgType.KeyVerificationRequest) return;
@@ -453,15 +448,6 @@ export default class Client{
 			if(await h.onMessage(message, sender, roomId)) return true;
 		}
 		return false;
-	}
-
-	async changeTrustedList(newList: string[]): Promise<void>{
-		this.trusted = {
-			trusted: newList
-		}
-		const file = await fs.open(this.trustedDir, 'w');
-		await file.write(JSON.stringify(this.trusted));
-		await file.close();
 	}
 
 	async sendReaction(roomId: string, msgId: string, emoji: string){

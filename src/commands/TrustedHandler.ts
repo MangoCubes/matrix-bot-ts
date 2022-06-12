@@ -6,30 +6,17 @@ export default class TrustedHandler extends CommandHandler{
 	async handleMessage(command: Command, sender: string, roomId: string): Promise<boolean> {
 		if(command.getName() !== this.prefix) return false;
 		const cmd = yargs().scriptName('!trust').help(false).version(false).exitProcess(false).command(['add', 'a'], 'Add new trusted users', async (cmd) => {
-			const args = await cmd.string(['_']).option('o', {
-				alias: 'overwrite',
-				type: 'boolean'
-			}).parseAsync(command.command.slice(2));
+			const args = await cmd.string(['_']).parseAsync(command.command.slice(2));
 			const input = this.normaliseNames(args._);
-			let newUserList = [];
-			if(args.o) newUserList = [...input];
-			else {
-				const tempSet = new Set(this.client.trusted.trusted.concat(input));
-				newUserList = Array.from(tempSet);
-			}
-			await this.changeUsers(newUserList);
-			await this.client.sendMessage(roomId, `The following users have been added to the trusted list:\n${this.client.trusted.trusted.join('\n')}`);
+			await this.client.db.addTrustedUser(input);
+			await this.client.sendMessage(roomId, `The following users have been added to the trusted list:\n${input.join('\n')}`);
 		}).command(['remove', 'r'], 'Remove trusted users', async (cmd) => {
 			const args = await cmd.parseAsync(command.command.slice(2));
 			const input = this.normaliseNames(args._);
-			let newUserList = [];
-			const tempSet = new Set<string>(this.client.trusted.trusted);
-			for(const u of input) tempSet.delete(u);
-			newUserList = Array.from(tempSet);
-			await this.changeUsers(newUserList);
+			await this.client.db.removeTrustedUser(input);
 			await this.client.sendMessage(roomId, `The following users have been removed to the trusted list:\n${input.join('\n')}`);
 		}).command(['list', 'ls'], 'List trusted users', async (cmd) => {
-			await this.client.sendMessage(roomId, 'List of trusted users:\n' + this.client.trusted.trusted.join('\n'));
+			await this.client.sendMessage(roomId, 'List of trusted users:\n' + (await this.client.db.getTrusted()).join('\n'));
 		}).demandCommand(1).showHelp(async (m) => {
 			await this.client.sendMessage(roomId, m);
 		}).showHelpOnFail(false).option('h', {
@@ -55,9 +42,5 @@ export default class TrustedHandler extends CommandHandler{
 			users.push(user);
 		}
 		return users;
-	}
-
-	async changeUsers(newList: string[]){
-		await this.client.changeTrustedList(Array.from(newList));
 	}
 }

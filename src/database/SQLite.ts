@@ -29,9 +29,38 @@ export default class SQLite{
 		tr();
 	}
 
+	async addTrustedUser(username: string[]){
+		const stmt = this.db.prepare('INSERT INTO trusted (user) VALUES (?);');
+		const tr = this.db.transaction(() => {
+			for(const u of username) stmt.run(u);
+        });
+		tr();
+	}
+
+	async removeTrustedUser(username: string[]){
+		const stmt = this.db.prepare('DELETE FROM trusted WHERE user = ?;');
+		const tr = this.db.transaction(() => {
+			for(const u of username) stmt.run(u);
+        });
+		tr();
+	}
+
+	async isTrusted(username: string){
+		return this.db.prepare(`SELECT EXISTS (SELECT * FROM trusted WHERE user = ?) AS res;`).get(username).res === 1;
+	}
+
+	async getTrusted(){
+		const stmt = this.db.prepare('SELECT user FROM trusted;');
+		const res = stmt.all();
+		let ret: string[] = [];
+		for(const r of res) ret.push(r.user);
+		return ret;
+	}
+
 	init(){
         try {
             this.db.exec('CREATE TABLE IF NOT EXISTS rss (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT);');
+			this.db.exec('CREATE TABLE IF NOT EXISTS trusted (user TEXT PRIMARY KEY);');
         } catch(e){
             if(process.env.NODE_ENV === 'development') throw e;
             return -1;
