@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import sdk, { ClientEvent, EventTimeline, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RelationType, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
+import sdk, { ClientEvent, EventType, JoinRule, MatrixError, MatrixEvent, MemoryCryptoStore, MsgType, Preset, RelationType, RestrictedAllowType, Room, RoomCreateTypeField, RoomEvent, RoomMemberEvent, RoomType, Visibility } from 'matrix-js-sdk';
 import { DecryptionError } from 'matrix-js-sdk/lib/crypto/algorithms';
 import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localStorage-crypto-store';
 import { LocalStorage } from 'node-localstorage';
@@ -10,7 +10,6 @@ import EchoHandler from './commands/EchoHandler';
 import InviteHandler from './commands/InviteHandler';
 import PurgeHandler from './commands/PurgeHandler';
 import { ConfigFile } from './generateConfig';
-import { promises as fs } from 'fs';
 import TrustedHandler from './commands/TrustedHandler';
 import LockHandler from './commands/LockHandler';
 import AliasHandler from './commands/AliasHandler';
@@ -18,6 +17,8 @@ import Command, { ParsingError } from './class/Command';
 import CurlHandler from './commands/CurlHandler';
 import SQLite from './database/SQLite';
 import RSSHandler from './commands/RSSHandler';
+import Task from './tasks/Task';
+import FetchRSS from './tasks/FetchRSS';
 
 
 type RoomCreationOptions = {
@@ -38,6 +39,8 @@ export default class Client{
 		[userId: string]: string;
 	}}
 	db: SQLite;
+	tasks: Task[];
+	customTasks: {[uid: string]: Task[]};
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		this.configDir = configDir;
 		this.trustedDir = trustedDir;
@@ -79,10 +82,17 @@ export default class Client{
 			/* Make sure AliasHandler is last to make sure it catches something that didn't trigger any commands.*/
 			new AliasHandler(this, '!alias', './config/commands/alias.json'),
 		];
+		this.tasks = [];
+		this.customTasks = {};
 		this.lock = {};
 	}
 
 	async init(){
+		this.tasks = [
+			new FetchRSS(this, 'RSS', 10)
+		];
+		for(const t of this.tasks) await t.loadTask();
+		for(const t of this.tasks) t.startTask();
 		//this.client.pickleKey = await createPickleKey(this.client.getUserId(), this.client.getDeviceId());
 		await this.client.initCrypto();
 		await this.client.startClient({ initialSyncLimit: 0 });

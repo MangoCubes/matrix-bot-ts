@@ -13,18 +13,18 @@ export default class SQLite{
 		tr();
 	}
 
-	async getRSSUrl(): Promise<{id: number, url: string}[]>{
-		const stmt = this.db.prepare('SELECT id, url FROM rss;');
+	async getRSSUrl(): Promise<{id: number, user: string, url: string}[]>{
+		const stmt = this.db.prepare('SELECT id, user, url FROM rss;');
 		const res = stmt.all();
 		let ret: Awaited<ReturnType<SQLite['getRSSUrl']>> = [];
-		for(const r of res) ret.push({id: r.id, url: r.url});
+		for(const r of res) ret.push({id: r.id, user: r.user, url: r.url});
 		return ret;
 	}
 
-	async addRSSUrl(url: string){
-		const stmt = this.db.prepare('INSERT INTO rss (url) VALUES (?);');
+	async addRSSUrl(url: string, user: string){
+		const stmt = this.db.prepare('INSERT INTO rss (url, user) VALUES (?, ?);');
 		const tr = this.db.transaction(() => {
-			stmt.run(url);
+			stmt.run(url, user);
         });
 		tr();
 	}
@@ -60,9 +60,11 @@ export default class SQLite{
 	init(){
         try {
 			this.db.exec('PRAGMA foreign_keys = ON;');
+			
             this.db.exec('CREATE TABLE IF NOT EXISTS rss (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, url TEXT, FOREIGN KEY (user) REFERENCES trusted(user));');
 			this.db.exec('CREATE TABLE IF NOT EXISTS trusted (user TEXT PRIMARY KEY);');
-        } catch(e){
+
+		} catch(e){
             if(process.env.NODE_ENV === 'development') throw e;
             return -1;
         }

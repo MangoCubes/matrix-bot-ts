@@ -17,7 +17,7 @@ export default class RSSHandler extends CommandHandler{
 			const exp = /[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&\/=]*)?/gi;
 			const url = args._[0];
 			if(typeof(url) === 'string' && url.match(exp)){
-				await this.client.db.addRSSUrl(url);
+				await this.client.db.addRSSUrl(url, sender);
 				await this.client.sendMessage(roomId, `Added new URL: ${url}.`);
 				return;
 			} else {
