@@ -16,6 +16,8 @@ import LockHandler from './commands/LockHandler';
 import AliasHandler from './commands/AliasHandler';
 import Command, { ParsingError } from './class/Command';
 import CurlHandler from './commands/CurlHandler';
+import SQLite from './database/SQLite';
+import { createPickleKey } from './crypto/PickleKey';
 
 
 type RoomCreationOptions = {
@@ -36,6 +38,7 @@ export default class Client{
 	lock: {[roomId: string]: {
 		[userId: string]: string;
 	}}
+	db: SQLite;
 	constructor(configDir: string, trustedDir: string, debugMode?: boolean){
 		this.configDir = configDir;
 		this.trustedDir = trustedDir;
@@ -63,7 +66,7 @@ export default class Client{
 			sessionStore: sessionStore,
 			userId: config.userId,
 			deviceId: config.deviceId,
-			verificationMethods: ['m.sas.v1'],
+			verificationMethods: ['m.sas.v1']
 		});
 		this.dmRooms = {};
 		this.handlers = [
@@ -79,9 +82,11 @@ export default class Client{
 			new AliasHandler(this, '!alias', './config/commands/alias.json'),
 		];
 		this.lock = {};
+		this.db = new SQLite('./config/sqlite.db');
 	}
 
 	async init(){
+		this.client.pickleKey = await createPickleKey(this.client.getUserId(), this.client.getDeviceId());
 		await this.client.initCrypto();
 		await this.client.startClient({ initialSyncLimit: 0 });
 		this.client.setGlobalErrorOnUnknownDevices(false);

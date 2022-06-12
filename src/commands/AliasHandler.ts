@@ -19,6 +19,8 @@ interface Alias{
  * $? can take only single string, whereas $* can take multiple.
  * As a result, when setting alias, $? cannot come after $*
  * Example use case: Triggering SMS sending task via !curl command
+ * !alias add -o "!curl http://localhost:7777 -X POST -d '{\\"message\\": \\"$*\\", \\"sendTo\\": \\"<Receiver>\\"}' -s"
+ * This makes a chatroom to automatically send POST request with that body every time a non-command message is sent.
  */
 
 export default class InviteHandler extends CommandHandler{
