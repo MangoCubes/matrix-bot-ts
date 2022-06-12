@@ -18,6 +18,7 @@ import Command, { ParsingError } from './class/Command';
 import CurlHandler from './commands/CurlHandler';
 import SQLite from './database/SQLite';
 import { createPickleKey } from './crypto/PickleKey';
+import RSSHandler from './commands/RSSHandler';
 
 
 type RoomCreationOptions = {
@@ -69,24 +70,26 @@ export default class Client{
 			verificationMethods: ['m.sas.v1']
 		});
 		this.dmRooms = {};
+		this.db = new SQLite('./config/sqlite.db');
+		this.db.init();
 		this.handlers = [
-			new DebugHandler(this, '!debug'),
+			new DebugHandler(this, '!debug', ),
 			new EchoHandler(this, '!echo'),
 			new InviteHandler(this, '!invite'),
 			new PurgeHandler(this, '!purge'),
 			new TrustedHandler(this, '!trust'),
 			new LockHandler(this, '!lock'),
 			new CurlHandler(this, '!curl'),
+			new RSSHandler(this, '!rss'),
 
 			/* Make sure AliasHandler is last to make sure it catches something that didn't trigger any commands.*/
 			new AliasHandler(this, '!alias', './config/commands/alias.json'),
 		];
 		this.lock = {};
-		this.db = new SQLite('./config/sqlite.db');
 	}
 
 	async init(){
-		this.client.pickleKey = await createPickleKey(this.client.getUserId(), this.client.getDeviceId());
+		//this.client.pickleKey = await createPickleKey(this.client.getUserId(), this.client.getDeviceId());
 		await this.client.initCrypto();
 		await this.client.startClient({ initialSyncLimit: 0 });
 		this.client.setGlobalErrorOnUnknownDevices(false);
